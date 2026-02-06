@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      
+      - name: Get version from tag
+        id: tag
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      
+      - name: Build Linux amd64
+        run: |
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ptp-linux-amd64 .
+          tar -czf ptp-linux-amd64.tar.gz ptp-linux-amd64
+      
+      - name: Build macOS Intel
+        run: |
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o ptp-darwin-amd64 .
+          tar -czf ptp-darwin-amd64.tar.gz ptp-darwin-amd64
+      
+      - name: Build macOS Apple Silicon
+        run: |
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o ptp-darwin-arm64 .
+          tar -czf ptp-darwin-arm64.tar.gz ptp-darwin-arm64
+      
+      - name: Generate checksums
+        run: |
+          sha256sum *.tar.gz > checksums.txt
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ptp-linux-amd64.tar.gz
+            ptp-darwin-amd64.tar.gz
+            ptp-darwin-arm64.tar.gz
+            checksums.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
