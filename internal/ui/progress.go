@@ -10,14 +10,16 @@ import (
 
 // ProgressBar creates and manages progress bars
 type ProgressBar struct {
-	bar *progressbar.ProgressBar
+	bar       *progressbar.ProgressBar
+	totalCount int
 }
 
 // NewProgressBar creates a new progress bar
 func NewProgressBar(count int) *ProgressBar {
 	bar := progressbar.NewOptions(count,
 		progressbar.OptionSetDescription(
-			color.CyanString("Running tests: ")+
+			color.CyanString("Running tests")+
+				color.WhiteString(" (%d detected): ", count)+
 				color.GreenString("[success: 0")+
 				" | "+
 				color.RedString("failed: 0]"),
@@ -38,14 +40,18 @@ func NewProgressBar(count int) *ProgressBar {
 		progressbar.OptionSetRenderBlankState(true),
 	)
 
-	return &ProgressBar{bar: bar}
+	return &ProgressBar{
+		bar:        bar,
+		totalCount: count,
+	}
 }
 
 // Update updates the progress bar with success and failure counts
 func (p *ProgressBar) Update(successCount, failCount int) {
 	p.bar.Set(successCount + failCount)
 	p.bar.Describe(
-		color.CyanString("Running tests: ") +
+		color.CyanString("Running tests") +
+			color.WhiteString(" (%d detected): ", p.totalCount) +
 			color.GreenString("[success: %d", successCount) +
 			" | " +
 			color.RedString("failed: %d]", failCount),
