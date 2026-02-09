@@ -1,40 +1,36 @@
-package main
+package ui
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/fatih/color"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
-	"github.com/spf13/cobra"
+	"ptp/internal/config"
+	"ptp/internal/domain"
+	"ptp/internal/storage"
 )
 
-var errorsCmd = &cobra.Command{
-	Use:   "faills",
-	Short: "View test failures interactively",
-	Long:  "Display test failures from the last test run in an interactive viewer",
-	RunE:  viewErrors,
+// ErrorViewer displays test failures in an interactive TUI
+type ErrorViewer struct {
+	config  *config.Config
+	storage storage.Storage
 }
 
-// viewErrors displays test failures in an interactive TUI
-func viewErrors(cmd *cobra.Command, args []string) error {
-	// Load test results from JSON file
-	outputPath := filepath.Join(OUTPUT_JSON_DIR, OUTPUT_JSON_FILE)
-	data, err := os.ReadFile(outputPath)
-	if err != nil {
-		return fmt.Errorf("failed to read test results file: %w\nRun tests first to generate results", err)
+// NewErrorViewer creates a new ErrorViewer
+func NewErrorViewer(cfg *config.Config, st storage.Storage) *ErrorViewer {
+	return &ErrorViewer{
+		config:  cfg,
+		storage: st,
 	}
+}
 
-	var results TestResultsOutput
-	if err := json.Unmarshal(data, &results); err != nil {
-		return fmt.Errorf("failed to parse test results: %w", err)
-	}
-
+// View displays test failures in an interactive TUI
+func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 	if len(results.Details) == 0 {
 		color.Green("✓ No test failures found!")
 		return nil
@@ -61,6 +57,7 @@ func viewErrors(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to marshal JSON: %w", err)
 		}
 
+		outputPath := ev.config.GetOutputPath()
 		return os.WriteFile(outputPath, jsonData, 0644)
 	}
 
@@ -69,7 +66,7 @@ func viewErrors(cmd *cobra.Command, args []string) error {
 
 	// Create list for failed tests (left side)
 	list := tview.NewList().
-		ShowSecondaryText(false). // Don't show secondary text
+		ShowSecondaryText(false).
 		SetHighlightFullLine(true).
 		SetSelectedFunc(func(index int, mainText string, secondaryText string, shortcut rune) {
 			// When Enter is pressed, we'll show details (handled by key handler)
@@ -86,10 +83,8 @@ func viewErrors(cmd *cobra.Command, args []string) error {
 		// Check if resolved
 		isResolved := resolved[index]
 		if isResolved {
-			// Show with checkmark and strikethrough effect (grayed out)
 			return fmt.Sprintf("[gray]✓ [yellow]%d.[gray] %s[white]", index+1, testName)
 		} else {
-			// Normal display
 			return fmt.Sprintf("[yellow]%d.[white] %s", index+1, testName)
 		}
 	}
@@ -100,7 +95,6 @@ func viewErrors(cmd *cobra.Command, args []string) error {
 			return
 		}
 		mainText := getListItemText(index)
-		// Update the item
 		list.SetItemText(index, mainText, "")
 	}
 
@@ -111,7 +105,6 @@ func viewErrors(cmd *cobra.Command, args []string) error {
 	}
 
 	// Set list colors for better visibility
-	// Use bright colors for selected items
 	list.SetMainTextColor(tview.Styles.PrimaryTextColor).
 		SetSelectedTextColor(tcell.ColorWhite).
 		SetSelectedBackgroundColor(tcell.ColorDarkCyan).
@@ -133,12 +126,12 @@ func viewErrors(cmd *cobra.Command, args []string) error {
 	detailsContainer := tview.NewFlex().
 		SetDirection(tview.FlexColumn).
 		AddItem(detailsView, 0, 1, false).
-		AddItem(tview.NewBox(), 2, 0, false) // 2 columns of padding on the right
+		AddItem(tview.NewBox(), 2, 0, false)
 
 	// Create right side layout: stats on top, details below
 	rightSide := tview.NewFlex().
 		SetDirection(tview.FlexRow).
-		AddItem(statsView, 3, 0, false). // 3 lines for stats
+		AddItem(statsView, 3, 0, false).
 		AddItem(detailsContainer, 0, 1, false)
 
 	// Create simple flex layout: list on left (1/3), details on right (2/3)
@@ -180,11 +173,11 @@ func viewErrors(cmd *cobra.Command, args []string) error {
 			failure := results.Details[index]
 
 			// Update stats header
-			statsText := formatFailureStats(failure, index+1)
+			statsText := ev.formatFailureStats(failure, index+1)
 			statsView.SetText(statsText)
 
 			// Update error details
-			detailsView.SetText(formatFailureDetails(failure))
+			detailsView.SetText(ev.formatFailureDetails(failure))
 		}
 	}
 
@@ -192,31 +185,22 @@ func viewErrors(cmd *cobra.Command, args []string) error {
 	list.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
 		case tcell.KeyUp, tcell.KeyDown:
-			// Let the list handle navigation
 			return event
 		case tcell.KeyEnter, tcell.KeyRight:
-			// Focus details view (though it's read-only, this shows it's selected)
 			app.SetFocus(detailsView)
 			return nil
 		case tcell.KeyCtrlC:
-			// Exit
 			app.Stop()
 			return nil
 		case tcell.KeyRune:
-			// Check for 'r' or 'R' to mark as resolved
 			if event.Rune() == 'r' || event.Rune() == 'R' {
 				index := list.GetCurrentItem()
 				if index >= 0 && index < len(results.Details) {
-					// Toggle resolved status
 					resolved[index] = !resolved[index]
 					updateListItem(index)
-					// Update header with new count
 					updateHeader()
-					// Update details to reflect the change
 					updateDetails()
-					// Save resolved status to JSON file
 					if err := saveResolvedStatus(); err != nil {
-						// Log error but don't stop the app
 						_ = err
 					}
 				}
@@ -230,11 +214,9 @@ func viewErrors(cmd *cobra.Command, args []string) error {
 	detailsView.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
 		case tcell.KeyLeft, tcell.KeyEsc:
-			// Go back to list
 			app.SetFocus(list)
 			return nil
 		case tcell.KeyCtrlC:
-			// Exit
 			app.Stop()
 			return nil
 		}
@@ -255,10 +237,9 @@ func viewErrors(cmd *cobra.Command, args []string) error {
 		AddItem(headerView, 1, 0, false).
 		AddItem(
 			tview.NewBox().SetDrawFunc(func(screen tcell.Screen, x, y, width, height int) (int, int, int, int) {
-				// Empty box for spacing
 				return x, y, width, height
 			}),
-			1, 0, false, // 1 line of padding
+			1, 0, false,
 		).
 		AddItem(flex, 0, 1, true)
 
@@ -271,7 +252,7 @@ func viewErrors(cmd *cobra.Command, args []string) error {
 }
 
 // formatFailureDetails formats a test failure for display
-func formatFailureDetails(failure TestFailure) string {
+func (ev *ErrorViewer) formatFailureDetails(failure domain.TestFailure) string {
 	var builder strings.Builder
 	w := tabwriter.NewWriter(&builder, 0, 0, 2, ' ', 0)
 
@@ -304,7 +285,7 @@ func formatFailureDetails(failure TestFailure) string {
 	if len(failure.StackTrace) > 0 {
 		fmt.Fprintf(w, "%s\n", color.YellowString("Stack Trace:"))
 		for i, trace := range failure.StackTrace {
-			if i < 10 { // Limit to first 10 lines
+			if i < 10 {
 				fmt.Fprintf(w, "  %s\n", trace)
 			}
 		}
@@ -318,10 +299,9 @@ func formatFailureDetails(failure TestFailure) string {
 }
 
 // formatFailureStats formats the stats header for a test failure
-func formatFailureStats(failure TestFailure, number int) string {
+func (ev *ErrorViewer) formatFailureStats(failure domain.TestFailure, number int) string {
 	var builder strings.Builder
 
-	// Format: path: path::testcase
 	path := failure.FilePath
 	if path == "" {
 		path = "Unknown path"
@@ -332,8 +312,6 @@ func formatFailureStats(failure TestFailure, number int) string {
 		testCase = fmt.Sprintf("Test %d", number)
 	}
 
-	// Format as: path: path::testcase with tview colors
-	// Use tview color tags: [cyan] for cyan, [yellow] for yellow
 	statsLine := fmt.Sprintf("[cyan]path:[white] [yellow]%s[white]::[yellow]%s[white]", path, testCase)
 	builder.WriteString(statsLine)
 	builder.WriteString("\n")
@@ -341,7 +319,3 @@ func formatFailureStats(failure TestFailure, number int) string {
 	return builder.String()
 }
 
-// colorizePath adds color to file paths
-func colorizePath(path string) string {
-	return color.CyanString(path)
-}

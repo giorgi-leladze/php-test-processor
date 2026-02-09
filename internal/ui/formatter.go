@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"encoding/json"
@@ -7,115 +7,33 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/fatih/color"
-	"github.com/schollz/progressbar/v3"
+	"ptp/internal/config"
+	"ptp/internal/domain"
+	"ptp/internal/discovery"
 )
 
-func formatTestExecutionOutput(output []string) {
+// Formatter formats and displays output
+type Formatter struct {
+	config  *config.Config
+	parser  *discovery.Parser
 }
 
-func formatTestListOutput(output []string) {
-}
-
-func formatTestVersionOutput(output []string) {
-}
-
-func progressBar(count int) *progressbar.ProgressBar {
-	// Create progress bar with dynamic description
-	bar := progressbar.NewOptions(count,
-		progressbar.OptionSetDescription(
-			color.CyanString("Running tests: ")+
-				color.GreenString("[success: 0")+
-				" | "+
-				color.RedString("failed: 0]"),
-		),
-		progressbar.OptionSetWidth(50),
-		progressbar.OptionSetTheme(progressbar.Theme{
-			Saucer:        color.CyanString("█"),
-			SaucerHead:    color.CyanString("█"),
-			SaucerPadding: "░",
-			BarStart:      "│",
-			BarEnd:        "│",
-		}),
-		progressbar.OptionEnableColorCodes(true),
-		progressbar.OptionOnCompletion(func() {
-			fmt.Print("\n")
-		}),
-		progressbar.OptionSetRenderBlankState(true),
-	)
-
-	return bar
-}
-
-func updateProgressBar(bar *progressbar.ProgressBar, successCount int, failCount int) {
-	bar.Set(successCount + failCount)
-	bar.Describe(
-		color.CyanString("Running tests: ") +
-			color.GreenString("[success: %d", successCount) +
-			" | " +
-			color.RedString("failed: %d]", failCount),
-	)
-}
-
-// outputTextResults formats and outputs test results as text
-func outputTextResults(results []TestResult, totalTests int, duration time.Duration) error {
-	var successCount, failCount int
-	var failedTests []TestResult
-
-	for _, result := range results {
-		if result.Success {
-			successCount++
-		} else {
-			failCount++
-			failedTests = append(failedTests, result)
-		}
+// NewFormatter creates a new Formatter
+func NewFormatter(cfg *config.Config, parser *discovery.Parser) *Formatter {
+	return &Formatter{
+		config: cfg,
+		parser: parser,
 	}
-
-	// Print summary
-	fmt.Print("\n")
-	color.Cyan("╔════════════════════════════════════════════════════════════╗")
-	color.Cyan("║                      Test Summary                          ║")
-	color.Cyan("╚════════════════════════════════════════════════════════════╝\n")
-
-	// Print statistics
-	if successCount > 0 {
-		color.Green("✓ Passed: %d", successCount)
-		fmt.Println()
-	}
-	if failCount > 0 {
-		color.Red("✗ Failed: %d", failCount)
-		fmt.Println()
-	}
-
-	color.White("Total: %d | Duration: %s\n", totalTests, duration.Round(time.Millisecond))
-
-	// Print failed tests if any
-	if failCount > 0 {
-		fmt.Println()
-		color.Red("╔════════════════════════════════════════════════════════════╗")
-		color.Red("║                      Failed Tests                          ║")
-		color.Red("╚════════════════════════════════════════════════════════════╝\n")
-
-		for i, result := range failedTests {
-			color.Red("%d. %s", i+1, result.TestPath)
-			if result.Error != nil {
-				color.Yellow("   Error: %v", result.Error)
-			}
-			fmt.Println()
-		}
-	}
-
-	return nil
 }
 
-// printMetaStats reads and displays meta statistics from the JSON results file
-func printMetaStats() error {
+// PrintMetaStats reads and displays meta statistics from the JSON results file
+func (f *Formatter) PrintMetaStats() error {
 	// Clear terminal screen
-	fmt.Print("\033[2J\033[H") // ANSI escape codes: clear screen and move cursor to top
+	fmt.Print("\033[2J\033[H")
 
-	outputPath := filepath.Join(OUTPUT_JSON_DIR, OUTPUT_JSON_FILE)
+	outputPath := f.config.GetOutputPath()
 
 	// Read JSON file
 	data, err := os.ReadFile(outputPath)
@@ -124,7 +42,7 @@ func printMetaStats() error {
 	}
 
 	// Parse JSON
-	var output TestResultsOutput
+	var output domain.TestResultsOutput
 	if err := json.Unmarshal(data, &output); err != nil {
 		return fmt.Errorf("failed to parse JSON: %w", err)
 	}
@@ -184,7 +102,7 @@ func printMetaStats() error {
 	} else {
 		color.Red("✗ %d test file(s) failed with %d test case failure(s)", meta.FailedTestFiles, meta.FailedTestCases)
 		fmt.Println()
-		printFailedTestsTree(output.Details)
+		f.printFailedTestsTree(output.Details)
 	}
 
 	return nil
@@ -194,18 +112,18 @@ func printMetaStats() error {
 type TreeNode struct {
 	Name     string
 	Children map[string]*TreeNode
-	Failures []TestFailure
+	Failures []domain.TestFailure
 	IsFile   bool
 }
 
 // printFailedTestsTree prints a tree structure of failed tests
-func printFailedTestsTree(failures []TestFailure) {
+func (f *Formatter) printFailedTestsTree(failures []domain.TestFailure) {
 	if len(failures) == 0 {
 		return
 	}
 
 	// Group failures by file path
-	fileMap := make(map[string][]TestFailure)
+	fileMap := make(map[string][]domain.TestFailure)
 	for _, failure := range failures {
 		fileMap[failure.FilePath] = append(fileMap[failure.FilePath], failure)
 	}
@@ -245,10 +163,10 @@ func printFailedTestsTree(failures []TestFailure) {
 	}
 
 	// Print tree recursively
-	printTreeNode(root, "", true, true)
+	f.printTreeNode(root, "", true, true)
 }
 
-func printTreeNode(node *TreeNode, prefix string, isLast bool, isRoot bool) {
+func (f *Formatter) printTreeNode(node *TreeNode, prefix string, isLast bool, isRoot bool) {
 	// Sort children for consistent output
 	var keys []string
 	for key := range node.Children {
@@ -309,24 +227,25 @@ func printTreeNode(node *TreeNode, prefix string, isLast bool, isRoot bool) {
 		} else {
 			newPrefix = prefix + "  |"
 		}
-		printTreeNode(child, newPrefix, isLastChild, false)
+		f.printTreeNode(child, newPrefix, isLastChild, false)
 	}
 }
 
-func printTestCasesFormater(tests []string) {
-	if GlobalFlags.TestCases {
+// PrintTestList prints a list of test files, optionally with test cases
+func (f *Formatter) PrintTestList(tests []string, showTestCases bool) error {
+	if showTestCases {
 		// Display tree view with test cases
 		color.Green("Found %d test file(s) with test cases:\n", len(tests))
 
 		for i, test := range tests {
-			testCases, err := findTestCases(test)
+			testCases, err := f.parser.FindTestCases(test)
 			if err != nil {
 				color.Red("Error reading test file %s: %v", test, err)
 				continue
 			}
 
 			// Get relative path for cleaner display
-			relPath, err := filepath.Rel(PROJECT_PATH, test)
+			relPath, err := filepath.Rel(f.config.ProjectPath, test)
 			if err != nil {
 				relPath = test
 			}
@@ -334,16 +253,13 @@ func printTestCasesFormater(tests []string) {
 			// Print test file as root node
 			isLastFile := i == len(tests)-1
 			if isLastFile {
-				// Last item
 				color.Cyan("└── %s", relPath)
 			} else {
-				// Not last item
 				color.Cyan("├── %s", relPath)
 			}
 
 			// Print test cases as children
 			if len(testCases) == 0 {
-				// No test cases found
 				var prefix string
 				if isLastFile {
 					prefix = "    └── "
@@ -385,7 +301,7 @@ func printTestCasesFormater(tests []string) {
 
 		for i, test := range tests {
 			// Get relative path for cleaner display
-			relPath, err := filepath.Rel(PROJECT_PATH, test)
+			relPath, err := filepath.Rel(f.config.ProjectPath, test)
 			if err != nil {
 				relPath = test
 			}
@@ -397,4 +313,7 @@ func printTestCasesFormater(tests []string) {
 			}
 		}
 	}
+
+	return nil
 }
+

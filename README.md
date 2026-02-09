@@ -23,30 +23,6 @@ A high-performance parallel test processor for PHPUnit tests written in Go. Exec
 - **PHPUnit**: Installed in your PHP project (`vendor/bin/phpunit`)
 - **Laravel**: Project should use Laravel framework (for migrations support)
 
-## 🚀 Quick Start
-
-**Fastest way to get started:**
-
-```bash
-# Linux
-wget https://github.com/giorgi-leladze/php-test-processor/releases/latest/download/ptp-linux-amd64.tar.gz
-tar -xzf ptp-linux-amd64.tar.gz
-sudo mv ptp-linux-amd64 /usr/local/bin/ptp && chmod +x /usr/local/bin/ptp
-
-# macOS (Apple Silicon)
-wget https://github.com/giorgi-leladze/php-test-processor/releases/latest/download/ptp-darwin-arm64.tar.gz
-tar -xzf ptp-darwin-arm64.tar.gz
-sudo mv ptp-darwin-arm64 /usr/local/bin/ptp && chmod +x /usr/local/bin/ptp
-
-# macOS (Intel)
-wget https://github.com/giorgi-leladze/php-test-processor/releases/latest/download/ptp-darwin-amd64.tar.gz
-tar -xzf ptp-darwin-amd64.tar.gz
-sudo mv ptp-darwin-amd64 /usr/local/bin/ptp && chmod +x /usr/local/bin/ptp
-
-# Verify installation
-ptp --version
-```
-
 ## 🔧 Installation
 
 ### Option 1: Download Pre-built Binary (Recommended)
@@ -199,82 +175,6 @@ ptp migrate --no-fresh
 ptp faills
 
 # Navigate with arrow keys, mark tests as resolved with 'R', view details with right arrow
-```
-
-## 🎯 Command Reference
-
-### `ptp run`
-
-Run PHPUnit tests in parallel.
-
-**Flags:**
-- `-p, --processors <number>`: Number of parallel processors/workers (default: 4)
-- `-t, --test-path <path>`: Path to folder where test detection should start
-- `-f, --filter <pattern>`: Filter tests by name pattern (supports wildcards: `*`, `?`)
-- `-m, --migrate`: Run database migrations before executing tests
-- `--no-fresh`: Run migrations without fresh (only pending migrations)
-
-**Examples:**
-```bash
-ptp run -p 8 -t tests/Unit -f "*UserTest.php"
-ptp run --migrate --processors 4
-```
-
-### `ptp list`
-
-List discovered test files and optionally their test cases.
-
-**Flags:**
-- `-t, --test-path <path>`: Path to folder where test detection should start
-- `-f, --filter <pattern>`: Filter tests by name pattern
-- `-c, --test-cases`: List test cases instead of just test files (tree view)
-
-**Examples:**
-```bash
-ptp list --test-cases
-ptp list -t tests/Integration -f "*Payment*" -c
-```
-
-### `ptp migrate`
-
-Run database migrations for all test databases in parallel.
-
-**Flags:**
-- `-p, --processors <number>`: Number of parallel workers
-- `--no-fresh`: Run migrations without fresh (only pending migrations)
-
-**Examples:**
-```bash
-ptp migrate -p 8
-ptp migrate --no-fresh
-```
-
-### `ptp faills`
-
-Open an interactive TUI to view and manage test failures from the last test run.
-
-**Navigation:**
-- `↑/↓`: Navigate through test failures
-- `→`: View detailed error information
-- `←`: Go back to list
-- `R`: Mark test as resolved/unresolved
-- `Ctrl+C`: Exit
-
-## 📁 Project Structure
-
-```
-.
-├── main.go              # Entry point
-├── registerCLI.go       # CLI command registration
-├── testDetection.go     # Test file discovery and parsing
-├── testExecution.go     # Parallel test execution
-├── parser.go            # Test result parsing
-├── formatter.go         # Output formatting
-├── errorsViewer.go      # Interactive error viewer
-├── migration.go         # Database migration handling
-├── utils.go             # Utility functions
-├── go.mod               # Go module definition
-└── README.md            # This file
 ```
 
 ## 🔍 How It Works

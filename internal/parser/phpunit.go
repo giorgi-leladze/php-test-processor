@@ -1,23 +1,24 @@
-package main
+package parser
 
 import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"ptp/internal/domain"
 )
 
-type TestFailure struct {
-	TestName     string   `json:"test_name"`
-	FilePath     string   `json:"file_path"`
-	ErrorDetails string   `json:"error_details"`
-	StackTrace   []string `json:"stack_trace"`
-	File         string   `json:"file"`
-	Line         int      `json:"line"`
-	Message      string   `json:"message"`
-	Resolved     bool     `json:"resolved,omitempty"` // Track if test case is marked as resolved
+// PHPUnitParser parses PHPUnit test output
+type PHPUnitParser struct{}
+
+// NewPHPUnitParser creates a new PHPUnitParser
+func NewPHPUnitParser() *PHPUnitParser {
+	return &PHPUnitParser{}
 }
 
-func parseTestFailure(result TestResult, failures *[]TestFailure) {
+// ParseFailure parses test failure from PHPUnit output
+func (p *PHPUnitParser) ParseFailure(result domain.TestResult) []domain.TestFailure {
+	var failures []domain.TestFailure
 	str := strings.Split(result.Output, "\n")
 
 	testFileName := result.TestPath
@@ -32,16 +33,18 @@ func parseTestFailure(result TestResult, failures *[]TestFailure) {
 		line := str[i]
 
 		if match.MatchString(line) {
-			testFailure := parseTestFailureCase(i, str, match)
-			*failures = append(*failures, *testFailure)
+			testFailure := p.parseTestFailureCase(i, str, match)
+			failures = append(failures, *testFailure)
 			continue
 		}
 	}
+
+	return failures
 }
 
-func parseTestFailureCase(i int, str []string, match *regexp.Regexp) *TestFailure {
-	filePath, name := parseTestFailureLine(str[i])
-	testFailure := &TestFailure{
+func (p *PHPUnitParser) parseTestFailureCase(i int, str []string, match *regexp.Regexp) *domain.TestFailure {
+	filePath, name := p.parseTestFailureLine(str[i])
+	testFailure := &domain.TestFailure{
 		TestName:     name,
 		FilePath:     filePath,
 		ErrorDetails: "",
@@ -125,7 +128,7 @@ func parseTestFailureCase(i int, str []string, match *regexp.Regexp) *TestFailur
 	return testFailure
 }
 
-func parseTestFailureLine(line string) (filepath string, name string) {
+func (p *PHPUnitParser) parseTestFailureLine(line string) (filepath string, name string) {
 	split := strings.Split(line, "::")
 
 	nm := split[0]
@@ -138,3 +141,4 @@ func parseTestFailureLine(line string) (filepath string, name string) {
 
 	return nm, n
 }
+

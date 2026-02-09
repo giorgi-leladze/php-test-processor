@@ -38,3 +38,49 @@ build/
 storage/
 *.log
 
+.env
+.env.example
+tests/
+
+main
+
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+
+# Environment files
+.env
+.env.*
+
+# Generated outputs
+*.png
+*.jpg
+*.svg
+*.pdf
+*.csv
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+analyze.sh
+benchmarkAnalize.py
+bench.json
+
+php/
+benchmark-run.sh
