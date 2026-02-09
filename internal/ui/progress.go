@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/fatih/color"
 	"github.com/schollz/progressbar/v3"
@@ -30,8 +31,9 @@ func NewProgressBar(count int) *ProgressBar {
 			BarEnd:        "│",
 		}),
 		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionSetWriter(os.Stderr),
 		progressbar.OptionOnCompletion(func() {
-			fmt.Print("\n")
+			fmt.Fprint(os.Stderr, "\n")
 		}),
 		progressbar.OptionSetRenderBlankState(true),
 	)

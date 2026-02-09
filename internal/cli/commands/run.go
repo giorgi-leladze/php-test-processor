@@ -76,6 +76,10 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Create and set progress bar
+	progressBar := ui.NewProgressBar(len(tests))
+	rc.executor.SetProgress(progressBar)
+
 	// Execute tests
 	results, duration, err := rc.executor.Execute(tests)
 	if err != nil {

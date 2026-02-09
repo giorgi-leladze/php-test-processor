@@ -6,6 +6,7 @@ import (
 
 	"ptp/internal/config"
 	"ptp/internal/domain"
+	"ptp/internal/ui"
 )
 
 // WorkerPool manages a pool of workers for parallel test execution
@@ -13,6 +14,7 @@ type WorkerPool struct {
 	config   *config.Config
 	runner   *Runner
 	scheduler Scheduler
+	progress *ui.ProgressBar
 }
 
 // NewWorkerPool creates a new WorkerPool
@@ -22,6 +24,11 @@ func NewWorkerPool(cfg *config.Config, runner *Runner, scheduler Scheduler) *Wor
 		runner:    runner,
 		scheduler: scheduler,
 	}
+}
+
+// SetProgress sets the progress bar for the worker pool
+func (wp *WorkerPool) SetProgress(progress *ui.ProgressBar) {
+	wp.progress = progress
 }
 
 // Execute executes tests in parallel using worker pool
@@ -71,6 +78,10 @@ func (wp *WorkerPool) Execute(tests []string) ([]domain.TestResult, time.Duratio
 				} else {
 					failCount++
 				}
+				// Update progress bar if available
+				if wp.progress != nil {
+					wp.progress.Update(successCount, failCount)
+				}
 				mu.Unlock()
 			}
 		}(i)
@@ -85,6 +96,11 @@ func (wp *WorkerPool) Execute(tests []string) ([]domain.TestResult, time.Duratio
 	var allResults []domain.TestResult
 	for result := range results {
 		allResults = append(allResults, result)
+	}
+
+	// Finish progress bar if available
+	if wp.progress != nil {
+		wp.progress.Finish()
 	}
 
 	duration := time.Since(startTime)
