@@ -24,19 +24,22 @@ jobs:
         id: tag
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
       
+      - name: Download dependencies
+        run: go mod download
+      
       - name: Build Linux amd64
         run: |
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o ptp-linux-amd64 .
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=${{ steps.tag.outputs.VERSION }}" -o ptp-linux-amd64 ./cmd/ptp
           tar -czf ptp-linux-amd64.tar.gz ptp-linux-amd64
       
       - name: Build macOS Intel
         run: |
-          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o ptp-darwin-amd64 .
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X main.version=${{ steps.tag.outputs.VERSION }}" -o ptp-darwin-amd64 ./cmd/ptp
           tar -czf ptp-darwin-amd64.tar.gz ptp-darwin-amd64
       
       - name: Build macOS Apple Silicon
         run: |
-          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o ptp-darwin-arm64 .
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X main.version=${{ steps.tag.outputs.VERSION }}" -o ptp-darwin-arm64 ./cmd/ptp
           tar -czf ptp-darwin-arm64.tar.gz ptp-darwin-arm64
       
       - name: Generate checksums
