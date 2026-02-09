@@ -94,7 +94,7 @@ func (c *Config) GetPHPUnitPath() string {
 func (c *Config) GetDatabaseName(workerID int) string {
 	prefix := os.Getenv("DB_DATABASE_PREFIX")
 	if prefix == "" {
-		prefix = "webiz_testing"
+		prefix = "testing"
 	}
 	return fmt.Sprintf("%s_%d", prefix, workerID)
 }

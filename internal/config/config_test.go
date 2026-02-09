@@ -58,7 +58,7 @@ func TestConfig_GetDatabaseName(t *testing.T) {
 	
 	t.Run("default database name", func(t *testing.T) {
 		name := cfg.GetDatabaseName(1)
-		expected := "webiz_testing_1"
+		expected := "testing_1"
 		if name != expected {
 			t.Errorf("expected %s, got %s", expected, name)
 		}
@@ -71,7 +71,7 @@ func TestConfig_GetDatabaseName(t *testing.T) {
 			if name == "" {
 				t.Errorf("database name should not be empty for worker %d", i)
 			}
-			// Check it follows the pattern webiz_testing_N
+			// Check it follows the pattern testing_N
 			if len(name) < 15 {
 				t.Errorf("database name seems too short for worker %d: %s", i, name)
 			}
