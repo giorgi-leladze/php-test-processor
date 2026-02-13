@@ -251,46 +251,41 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 	return nil
 }
 
-// formatFailureDetails formats a test failure for display
+// formatFailureDetails formats a test failure for display using tview color tags ([red], [cyan], etc.)
 func (ev *ErrorViewer) formatFailureDetails(failure domain.TestFailure) string {
 	var builder strings.Builder
 	w := tabwriter.NewWriter(&builder, 0, 0, 2, ' ', 0)
 
 	// Test name
-	fmt.Fprintf(w, "%s\n", color.RedString("✗ Test: %s", failure.TestName))
-	fmt.Fprintf(w, "\n")
+	fmt.Fprintf(w, "[red]✗ Test: %s[white]\n\n", failure.TestName)
 
 	// File path
-	fmt.Fprintf(w, "%s\n", color.CyanString("File: %s", failure.FilePath))
+	fmt.Fprintf(w, "[cyan]File: %s[white]\n", failure.FilePath)
 	if failure.File != "" && failure.Line > 0 {
-		fmt.Fprintf(w, "%s\n", color.YellowString("Location: %s:%d", failure.File, failure.Line))
+		fmt.Fprintf(w, "[yellow]Location: %s:%d[white]\n", failure.File, failure.Line)
 	}
 	fmt.Fprintf(w, "\n")
 
 	// Error message
 	if failure.Message != "" {
-		fmt.Fprintf(w, "%s\n", color.YellowString("Message:"))
-		fmt.Fprintf(w, "%s\n", failure.Message)
-		fmt.Fprintf(w, "\n")
+		fmt.Fprintf(w, "[yellow]Message:[white]\n%s\n\n", failure.Message)
 	}
 
 	// Error details (JSON)
 	if failure.ErrorDetails != "" {
-		fmt.Fprintf(w, "%s\n", color.YellowString("Error Details:"))
-		fmt.Fprintf(w, "%s\n", failure.ErrorDetails)
-		fmt.Fprintf(w, "\n")
+		fmt.Fprintf(w, "[yellow]Error Details:[white]\n%s\n\n", failure.ErrorDetails)
 	}
 
 	// Stack trace
 	if len(failure.StackTrace) > 0 {
-		fmt.Fprintf(w, "%s\n", color.YellowString("Stack Trace:"))
+		fmt.Fprintf(w, "[yellow]Stack Trace:[white]\n")
 		for i, trace := range failure.StackTrace {
 			if i < 10 {
 				fmt.Fprintf(w, "  %s\n", trace)
 			}
 		}
 		if len(failure.StackTrace) > 10 {
-			fmt.Fprintf(w, "  ... and %d more lines\n", len(failure.StackTrace)-10)
+			fmt.Fprintf(w, "  [gray]... and %d more lines[white]\n", len(failure.StackTrace)-10)
 		}
 	}
 
