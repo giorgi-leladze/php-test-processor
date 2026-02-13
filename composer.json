@@ -22,10 +22,5 @@
         "php": ">=7.4",
         "ext-json": "*",
         "composer-plugin-api": "^2.0"
-    },
-    "config": {
-        "allow-plugins": {
-            "giorgi-leladze/ptp": true
-        }
     }
 }
