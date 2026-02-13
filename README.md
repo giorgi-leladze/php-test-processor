@@ -27,45 +27,20 @@ A high-performance parallel test processor for PHPUnit tests written in Go. Exec
 
 ### Option 1: Download Pre-built Binary (Recommended)
 
-Download the latest release for your platform:
-
 **Linux (64-bit):**
 ```bash
-# Download
-wget https://github.com/giorgi-leladze/php-test-processor/releases/latest/download/ptp-linux-amd64.tar.gz
+curl -sL https://github.com/giorgi-leladze/php-test-processor/releases/latest/download/ptp-linux-amd64.tar.gz | tar -xz && sudo mv ptp-linux-amd64 /usr/local/bin/ptp && chmod +x /usr/local/bin/ptp
 
-# Extract
-tar -xzf ptp-linux-amd64.tar.gz
-
-# Move to PATH (optional)
-sudo mv ptp-linux-amd64 /usr/local/bin/ptp
-chmod +x /usr/local/bin/ptp
 ```
 
 **macOS Intel:**
 ```bash
-# Download
-wget https://github.com/giorgi-leladze/php-test-processor/releases/latest/download/ptp-darwin-amd64.tar.gz
-
-# Extract
-tar -xzf ptp-darwin-amd64.tar.gz
-
-# Move to PATH (optional)
-sudo mv ptp-darwin-amd64 /usr/local/bin/ptp
-chmod +x /usr/local/bin/ptp
+curl -sL https://github.com/giorgi-leladze/php-test-processor/releases/latest/download/ptp-darwin-amd64.tar.gz | tar -xz && sudo mv ptp-darwin-amd64 /usr/local/bin/ptp && chmod +x /usr/local/bin/ptp
 ```
 
 **macOS Apple Silicon (M1/M2/M3):**
 ```bash
-# Download
-wget https://github.com/giorgi-leladze/php-test-processor/releases/latest/download/ptp-darwin-arm64.tar.gz
-
-# Extract
-tar -xzf ptp-darwin-arm64.tar.gz
-
-# Move to PATH (optional)
-sudo mv ptp-darwin-arm64 /usr/local/bin/ptp
-chmod +x /usr/local/bin/ptp
+curl -sL https://github.com/giorgi-leladze/php-test-processor/releases/latest/download/ptp-darwin-arm64.tar.gz | tar -xz && sudo mv ptp-darwin-arm64 /usr/local/bin/ptp && chmod +x /usr/local/bin/ptp
 ```
 
 Or visit the [Releases](https://github.com/giorgi-leladze/php-test-processor/releases) page to download manually.
