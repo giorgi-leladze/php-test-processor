@@ -1,0 +1,31 @@
+{
+    "name": "giorgi-leladze/ptp",
+    "description": "PHP Test Processor - high-performance parallel test runner for PHPUnit",
+    "type": "composer-plugin",
+    "license": "MIT",
+    "keywords": ["phpunit", "testing", "parallel", "laravel"],
+    "homepage": "https://github.com/giorgi-leladze/php-test-processor",
+    "bin": ["bin/ptp"],
+    "extra": {
+        "class": "Ptp\\Plugin"
+    },
+    "autoload": {
+        "psr-4": {
+            "Ptp\\": "src/"
+        }
+    },
+    "scripts": {
+        "post-install-cmd": ["@php scripts/download-ptp.php"],
+        "post-update-cmd": ["@php scripts/download-ptp.php"]
+    },
+    "require": {
+        "php": ">=7.4",
+        "ext-json": "*",
+        "composer-plugin-api": "^2.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "giorgi-leladze/ptp": true
+        }
+    }
+}

@@ -1,6 +1,7 @@
 # Binaries
 /ptp
 /php-test-processor
+bin/ptp-binary
 *.exe
 *.exe~
 *.dll
