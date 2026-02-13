@@ -231,6 +231,19 @@ func (f *Formatter) printTreeNode(node *TreeNode, prefix string, isLast bool, is
 	}
 }
 
+// CountTestCases returns the total number of test cases across the given test files.
+func (f *Formatter) CountTestCases(tests []string) (int, error) {
+	var total int
+	for _, test := range tests {
+		cases, err := f.parser.FindTestCases(test)
+		if err != nil {
+			return 0, err
+		}
+		total += len(cases)
+	}
+	return total, nil
+}
+
 // PrintTestList prints a list of test files, optionally with test cases
 func (f *Formatter) PrintTestList(tests []string, showTestCases bool) error {
 	if showTestCases {

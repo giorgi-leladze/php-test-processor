@@ -10,16 +10,24 @@ import (
 
 // ProgressBar creates and manages progress bars
 type ProgressBar struct {
-	bar       *progressbar.ProgressBar
-	totalCount int
+	bar          *progressbar.ProgressBar
+	totalCount   int
+	testCaseCount int
 }
 
-// NewProgressBar creates a new progress bar
-func NewProgressBar(count int) *ProgressBar {
-	bar := progressbar.NewOptions(count,
+// NewProgressBar creates a new progress bar. fileCount is the number of test files (bar total);
+// testCaseCount is the number of test cases to show in the label (use 0 to show file count).
+func NewProgressBar(fileCount, testCaseCount int) *ProgressBar {
+	descCount := fileCount
+	descLabel := "files"
+	if testCaseCount > 0 {
+		descCount = testCaseCount
+		descLabel = "test cases"
+	}
+	bar := progressbar.NewOptions(fileCount,
 		progressbar.OptionSetDescription(
 			color.CyanString("Running tests")+
-				color.WhiteString(" (%d detected): ", count)+
+				color.WhiteString(" (%d %s): ", descCount, descLabel)+
 				color.GreenString("[success: 0")+
 				" | "+
 				color.RedString("failed: 0]"),
@@ -41,20 +49,28 @@ func NewProgressBar(count int) *ProgressBar {
 	)
 
 	return &ProgressBar{
-		bar:        bar,
-		totalCount: count,
+		bar:           bar,
+		totalCount:   fileCount,
+		testCaseCount: testCaseCount,
 	}
 }
 
-// Update updates the progress bar with success and failure counts
-func (p *ProgressBar) Update(successCount, failCount int) {
-	p.bar.Set(successCount + failCount)
+// Update updates the progress bar. filesCompleted is the bar position (0..fileCount);
+// passedCases and failedCases are test case counts shown in the label.
+func (p *ProgressBar) Update(filesCompleted, passedCases, failedCases int) {
+	p.bar.Set(filesCompleted)
+	descCount := p.totalCount
+	descLabel := "files"
+	if p.testCaseCount > 0 {
+		descCount = p.testCaseCount
+		descLabel = "test cases"
+	}
 	p.bar.Describe(
 		color.CyanString("Running tests") +
-			color.WhiteString(" (%d detected): ", p.totalCount) +
-			color.GreenString("[success: %d", successCount) +
+			color.WhiteString(" (%d %s): ", descCount, descLabel) +
+			color.GreenString("[success: %d", passedCases) +
 			" | " +
-			color.RedString("failed: %d]", failCount),
+			color.RedString("failed: %d]", failedCases),
 	)
 }
 

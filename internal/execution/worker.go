@@ -6,6 +6,7 @@ import (
 
 	"ptp/internal/config"
 	"ptp/internal/domain"
+	"ptp/internal/parser"
 	"ptp/internal/ui"
 )
 
@@ -15,14 +16,16 @@ type WorkerPool struct {
 	runner   *Runner
 	scheduler Scheduler
 	progress *ui.ProgressBar
+	parser   *parser.PHPUnitParser
 }
 
 // NewWorkerPool creates a new WorkerPool
-func NewWorkerPool(cfg *config.Config, runner *Runner, scheduler Scheduler) *WorkerPool {
+func NewWorkerPool(cfg *config.Config, runner *Runner, scheduler Scheduler, phpUnitParser *parser.PHPUnitParser) *WorkerPool {
 	return &WorkerPool{
 		config:    cfg,
 		runner:    runner,
 		scheduler: scheduler,
+		parser:    phpUnitParser,
 	}
 }
 
@@ -47,10 +50,10 @@ func (wp *WorkerPool) Execute(tests []string) ([]domain.TestResult, time.Duratio
 	}
 	close(testQueue)
 
-	// Track progress
+	// Track progress: file count for bar position, test case counts for label
 	var mu sync.Mutex
-	var completedCount int
-	var successCount, failCount int
+	var completedFiles int
+	var passedCases, failedCases int
 
 	startTime := time.Now()
 
@@ -72,15 +75,21 @@ func (wp *WorkerPool) Execute(tests []string) ([]domain.TestResult, time.Duratio
 				results <- result
 
 				mu.Lock()
-				completedCount++
-				if result.Success {
-					successCount++
+				completedFiles++
+				if wp.parser != nil {
+					p, f := wp.parser.ParseTestCounts(result)
+					passedCases += p
+					failedCases += f
 				} else {
-					failCount++
+					if result.Success {
+						passedCases++
+					} else {
+						failedCases++
+					}
 				}
-				// Update progress bar if available
+				// Update progress bar if available (bar position = files, label = test cases)
 				if wp.progress != nil {
-					wp.progress.Update(successCount, failCount)
+					wp.progress.Update(completedFiles, passedCases, failedCases)
 				}
 				mu.Unlock()
 			}

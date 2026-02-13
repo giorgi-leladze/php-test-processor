@@ -16,6 +16,48 @@ func NewPHPUnitParser() *PHPUnitParser {
 	return &PHPUnitParser{}
 }
 
+// ParseTestCounts extracts passed and failed test case counts from PHPUnit output.
+// Returns (passed, failed). If parsing fails, returns (1,0) for success or (0,1) for failure (file-level fallback).
+func (p *PHPUnitParser) ParseTestCounts(result domain.TestResult) (passed, failed int) {
+	output := result.Output
+
+	// OK (N tests, ...) - all passed
+	okMatch := regexp.MustCompile(`OK\s*\(\s*(\d+)\s+tests`).FindStringSubmatch(output)
+	if len(okMatch) >= 2 {
+		var total int
+		fmt.Sscanf(okMatch[1], "%d", &total)
+		return total, 0
+	}
+
+	// FAILURES! or ERRORS! - Tests: N, Assertions: ..., Failures: F, Errors: E
+	testsMatch := regexp.MustCompile(`Tests:\s*(\d+)`).FindStringSubmatch(output)
+	failMatch := regexp.MustCompile(`Failures:\s*(\d+)`).FindStringSubmatch(output)
+	errMatch := regexp.MustCompile(`Errors:\s*(\d+)`).FindStringSubmatch(output)
+	var total, failures, errors int
+	if len(testsMatch) >= 2 {
+		fmt.Sscanf(testsMatch[1], "%d", &total)
+	}
+	if len(failMatch) >= 2 {
+		fmt.Sscanf(failMatch[1], "%d", &failures)
+	}
+	if len(errMatch) >= 2 {
+		fmt.Sscanf(errMatch[1], "%d", &errors)
+	}
+	failed = failures + errors
+	if total >= failed {
+		passed = total - failed
+	}
+	if passed > 0 || failed > 0 {
+		return passed, failed
+	}
+
+	// Fallback: one "test" per file
+	if result.Success {
+		return 1, 0
+	}
+	return 0, 1
+}
+
 // ParseFailure parses test failure from PHPUnit output
 func (p *PHPUnitParser) ParseFailure(result domain.TestResult) []domain.TestFailure {
 	var failures []domain.TestFailure
