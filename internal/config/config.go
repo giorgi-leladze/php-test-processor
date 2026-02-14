@@ -80,9 +80,14 @@ func (c *Config) GetTestPath() string {
 	return filepath.Join(c.ProjectPath, c.TestPath)
 }
 
-// GetOutputPath returns the full path to the output JSON file
+// GetOutputPath returns the full path to the output JSON file (under project so run and faills use the same file).
+// Resolves to an absolute path so run and faills always read/write the same file regardless of cwd.
 func (c *Config) GetOutputPath() string {
-	return filepath.Join(c.OutputJSONDir, c.OutputJSONFile)
+	p := filepath.Join(c.ProjectPath, c.OutputJSONDir, c.OutputJSONFile)
+	if abs, err := filepath.Abs(p); err == nil {
+		return abs
+	}
+	return p
 }
 
 // GetPHPUnitPath returns the path to PHPUnit binary

@@ -1,9 +1,15 @@
 package ui
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"text/tabwriter"
+	"unicode"
 
 	"github.com/fatih/color"
 	"github.com/gdamore/tcell/v2"
@@ -14,11 +20,11 @@ import (
 	"ptp/internal/storage"
 )
 
-// LaraMux-style colors (dark theme, orange accent)
+// LaraMux-style colors (dark theme, cyan accent)
 var (
 	faillsBgDark    = tcell.NewRGBColor(30, 35, 42)   // dark blue-grey
 	faillsFg        = tcell.NewRGBColor(220, 220, 220) // off-white
-	faillsAccent    = tcell.NewRGBColor(230, 126, 34)  // orange
+	faillsAccent    = tcell.NewRGBColor(0, 188, 212)  // cyan
 	faillsGreen     = tcell.NewRGBColor(46, 204, 113)  // green (resolved)
 	faillsBorder    = tcell.NewRGBColor(60, 68, 78)
 	faillsTitleFg   = tcell.NewRGBColor(240, 240, 240)
@@ -50,6 +56,88 @@ func NewErrorViewer(cfg *config.Config, st storage.Storage, runner SingleTestRun
 
 func failureKey(f *domain.TestFailure) string {
 	return f.FilePath + "\x00" + f.TestName
+}
+
+// failureKeyNormalized returns a key that matches across path/name format differences (e.g. with/without .php, backslash vs slash).
+func failureKeyNormalized(f *domain.TestFailure) string {
+	path := strings.ReplaceAll(f.FilePath, "\\", "/")
+	path = strings.TrimSuffix(path, ".php")
+	name := normalizeTestNameForSearch(f.TestName)
+	return path + "\x00" + name
+}
+
+// normalizeTestNameForSearch strips data provider suffix and trims (e.g. "test_foo with data set #0" -> "test_foo").
+func normalizeTestNameForSearch(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.Index(s, " with "); i >= 0 {
+		s = s[:i]
+	}
+	return strings.TrimSpace(s)
+}
+
+// snakeToCamel converts test_foo_bar to testFooBar.
+func snakeToCamel(s string) string {
+	parts := strings.Split(s, "_")
+	for i := 1; i < len(parts); i++ {
+		if len(parts[i]) > 0 {
+			parts[i] = strings.ToUpper(string(parts[i][0])) + strings.ToLower(parts[i][1:])
+		}
+	}
+	return strings.Join(parts, "")
+}
+
+// camelToSnake converts testFooBar to test_foo_bar.
+func camelToSnake(s string) string {
+	var b strings.Builder
+	for i, r := range s {
+		if i > 0 && unicode.IsUpper(r) {
+			b.WriteByte('_')
+		}
+		b.WriteRune(unicode.ToLower(r))
+	}
+	return b.String()
+}
+
+// findTestFunctionLine returns the 1-based line number of the PHP function matching testName in the file, or 0 if not found.
+func findTestFunctionLine(filePath, testName string) int {
+	testName = normalizeTestNameForSearch(testName)
+	if testName == "" {
+		return 0
+	}
+	// Try exact name and common PHP naming variants (snake_case vs camelCase).
+	namesToTry := []string{testName}
+	if strings.Contains(testName, "_") {
+		namesToTry = append(namesToTry, snakeToCamel(testName))
+	} else {
+		namesToTry = append(namesToTry, camelToSnake(testName))
+	}
+
+	f, err := os.Open(filePath)
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	lineNum := 0
+	for scanner.Scan() {
+		lineNum++
+		line := scanner.Text()
+		idx := strings.Index(line, "function ")
+		if idx < 0 {
+			continue
+		}
+		after := strings.TrimSpace(line[idx+len("function "):])
+		// Strip trailing ( and everything after for comparison
+		if p := strings.Index(after, "("); p >= 0 {
+			after = strings.TrimSpace(after[:p])
+		}
+		for _, name := range namesToTry {
+			if after == name || strings.HasPrefix(after, name+" ") {
+				return lineNum
+			}
+		}
+	}
+	return 0
 }
 
 // View displays test failures in an interactive TUI (LaraMux-inspired design)
@@ -165,7 +253,7 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 		}
 		prefix := "  "
 		if selected {
-			prefix = "[orange]►[white] "
+			prefix = "[cyan]►[white] "
 		}
 		if runningKeys[failureKey(failure)] {
 			return fmt.Sprintf("%s[yellow]  ⟳  [white] %d. %s", prefix, listPos, testName)
@@ -338,14 +426,14 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 	getFooterForMode := func(mode string) string {
 		switch mode {
 		case "test_cases_filter":
-			return "[orange]Enter[white] Apply  [orange]Esc[white] Cancel & clear marks  [orange]Ctrl+C[white] Quit"
+			return "[cyan]Enter[white] Apply  [cyan]Esc[white] Cancel & clear marks  [cyan]Ctrl+C[white] Quit"
 		case "test_case_view":
-			return "[orange]←[white]/[orange]Esc[white] Back to list  [orange]Ctrl+C[white] Quit"
+			return "[cyan]←[white]/[cyan]Esc[white] Back to list  [cyan]e[white] Edit in editor  [cyan]Ctrl+C[white] Quit"
 		case "test_cases_list_group_selection":
-			return "[orange]r[white] Rerun marked  [orange]Space[white] Toggle mark  [orange]Enter[white] View  [orange]f[white] Filter  [orange]Esc[white] Clear marks & exit  ↑↓ Navigate  [orange]Ctrl+C[white] Quit"
+			return "[cyan]r[white] Rerun marked  [cyan]e[white] Edit  [cyan]Space[white] Toggle mark  [cyan]Enter[white] View  [cyan]f[white] Filter  [cyan]Esc[white] Clear marks & exit  ↑↓ Navigate  [cyan]Ctrl+C[white] Quit"
 		}
 		// test_cases_list and fallback
-		return "[orange]r[white] Rerun  [orange]Space[white] Mark  [orange]Enter[white] View details  [orange]f[white] Filter  ↑↓ Navigate  [orange]Esc[white] Clear marks  [orange]Ctrl+C[white] Quit"
+		return "[cyan]r[white] Rerun  [cyan]e[white] Edit  [cyan]Space[white] Mark  [cyan]Enter[white] View details  [cyan]f[white] Filter  ↑↓ Navigate  [cyan]Esc[white] Clear marks  [cyan]Ctrl+C[white] Quit"
 	}
 
 	updateFooter = func() {
@@ -364,6 +452,93 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 		footer.SetText(getFooterForMode(mode))
 	}
 	updateFooter()
+
+	// Open current failure's test file in $EDITOR (suspend TUI while editing).
+	openEditorForCurrentFailure := func() bool {
+		listIdx := list.GetCurrentItem()
+		if listIdx < 0 || listIdx >= len(filteredIndices) {
+			return false
+		}
+		realIdx := filteredIndices[listIdx]
+		failure := &results.Details[realIdx]
+		var absPath string
+		if filepath.IsAbs(failure.FilePath) {
+			absPath = failure.FilePath
+		} else {
+			absPath = filepath.Join(ev.config.ProjectPath, failure.FilePath)
+		}
+		absPath, _ = filepath.Abs(absPath)
+		if _, err := os.Stat(absPath); err != nil {
+			// PHPUnit often reports paths without .php; try appending it
+			tryPHP := absPath + ".php"
+			if _, err2 := os.Stat(tryPHP); err2 == nil {
+				absPath = tryPHP
+			} else {
+				detailsView.SetText("[yellow]File not found: " + absPath + " (also tried " + tryPHP + ")[white]")
+				return false
+			}
+		}
+		editorEnv := os.Getenv("EDITOR")
+		candidates := []string{}
+		if editorEnv != "" {
+			candidates = append(candidates, editorEnv)
+		}
+		candidates = append(candidates, "vim", "vi", "nano")
+		var editorName string
+		var args []string
+		for _, ed := range candidates {
+			parts := strings.Fields(ed)
+			if len(parts) == 0 {
+				continue
+			}
+			if _, err := exec.LookPath(parts[0]); err != nil {
+				continue
+			}
+			editorName = parts[0]
+			args = append([]string{}, parts[1:]...)
+			break
+		}
+		if editorName == "" {
+			detailsView.SetText("[yellow]No editor found. Install vim/nano or set EDITOR (e.g. export EDITOR=nano)[white]")
+			return false
+		}
+		line := failure.Line
+		if line <= 0 && failure.TestName != "" {
+			line = findTestFunctionLine(absPath, failure.TestName)
+		}
+		if line > 0 {
+			args = append(args, "+"+strconv.Itoa(line))
+		}
+		args = append(args, absPath)
+		runEditor := func() {
+			// Use /dev/tty so the editor gets the controlling terminal (works in IDE terminals)
+			tty, ttyErr := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+			if ttyErr != nil {
+				tty = nil
+			}
+			// Run via shell so PATH and env match the user's (e.g. in Cursor terminal)
+			shellArgs := append([]string{"-c", "exec \"$@\"", "sh", editorName}, args...)
+			cmd := exec.Command("sh", shellArgs...)
+			if tty != nil {
+				cmd.Stdin = tty
+				cmd.Stdout = tty
+				cmd.Stderr = tty
+				defer tty.Close()
+			} else {
+				cmd.Stdin = os.Stdin
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+			}
+			cmd.Dir = ev.config.ProjectPath
+			_ = cmd.Run()
+		}
+		suspended := app.Suspend(runEditor)
+		if !suspended {
+			detailsView.SetText("[yellow]Could not open editor (terminal suspend failed). Run ptp from a real terminal (e.g. iTerm, Terminal.app) or set EDITOR=nano[white]")
+			return false
+		}
+		return true
+	}
 
 	// --- Root layout ---
 	root := tview.NewFlex().
@@ -422,17 +597,41 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 		refreshAllListItems()
 
 		go func() {
-			toRemove := make(map[string]bool)
+			toRemove := make(map[string]bool)   // normalized keys: skip these in newDetails
+			toRemoveOrigKeys := []string{}      // original keys: clear these from marked
 			toUpdate := make(map[string]domain.TestFailure)
+			var rerunErr string                  // non-empty if rerun failed (e.g. PHPUnit error)
 			for _, f := range targets {
-				key := failureKey(f)
-				result := ev.runner.RunFiltered(f.FilePath, f.TestName, 1)
+				normKey := failureKeyNormalized(f)
+				origKey := failureKey(f)
+				runPath := f.FilePath
+				if !strings.HasSuffix(runPath, ".php") {
+					tryPath := filepath.Join(ev.config.ProjectPath, runPath+".php")
+					if _, err := os.Stat(tryPath); err == nil {
+						runPath = runPath + ".php"
+					}
+				}
+				result := ev.runner.RunFiltered(runPath, f.TestName, 1)
 				if result.Success {
-					toRemove[key] = true
+					toRemove[normKey] = true
+					toRemoveOrigKeys = append(toRemoveOrigKeys, origKey)
 				} else {
 					failures := ev.parser.ParseFailure(result)
 					if len(failures) > 0 {
-						toUpdate[key] = failures[0]
+						toUpdate[normKey] = failures[0]
+					} else {
+						// Rerun failed but we couldn't parse (e.g. PHPUnit not found, wrong path)
+						if result.Error != nil {
+							rerunErr = result.Error.Error()
+						} else if result.Output != "" {
+							lines := strings.SplitN(strings.TrimSpace(result.Output), "\n", 5)
+							rerunErr = strings.Join(lines, " ")
+							if len(rerunErr) > 200 {
+								rerunErr = rerunErr[:197] + "..."
+							}
+						} else {
+							rerunErr = "rerun failed (no output)"
+						}
 					}
 				}
 			}
@@ -445,17 +644,21 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 				for _, key := range targetKeys {
 					delete(runningKeys, key)
 				}
-				for key := range toRemove {
+				for _, key := range toRemoveOrigKeys {
 					delete(marked, key)
+				}
+
+				if rerunErr != "" {
+					detailsView.SetText("[yellow]Rerun failed: " + rerunErr + "[white]\n\nPress ← or Esc to go back.")
 				}
 
 				var newDetails []domain.TestFailure
 				for _, f := range results.Details {
-					key := failureKey(&f)
-					if toRemove[key] {
+					normKey := failureKeyNormalized(&f)
+					if toRemove[normKey] {
 						continue
 					}
-					if upd, ok := toUpdate[key]; ok {
+					if upd, ok := toUpdate[normKey]; ok {
 						newDetails = append(newDetails, upd)
 					} else {
 						newDetails = append(newDetails, f)
@@ -465,6 +668,11 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 				results.Meta.FailedTestCases = len(newDetails)
 
 				if err := ev.storage.SaveOutput(results); err != nil {
+					detailsView.SetText("[yellow]Failed to save results: " + err.Error() + "[white]")
+					applyFilter()
+					rebuildList()
+					updateHeaderCounts()
+					updateDetails()
 					return
 				}
 				applyFilter()
@@ -547,6 +755,10 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 				showFilter()
 				return nil
 			}
+			if event.Rune() == 'e' || event.Rune() == 'E' {
+				openEditorForCurrentFailure()
+				return nil
+			}
 		}
 		return event
 	})
@@ -555,11 +767,17 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 		switch event.Key() {
 		case tcell.KeyLeft, tcell.KeyEsc:
 			app.SetFocus(list)
+			updateDetails() // restore details content (e.g. after editor error message)
 			updateFooter()
 			return nil
 		case tcell.KeyCtrlC:
 			app.Stop()
 			return nil
+		case tcell.KeyRune:
+			if event.Rune() == 'e' || event.Rune() == 'E' {
+				openEditorForCurrentFailure()
+				return nil
+			}
 		}
 		return event
 	})

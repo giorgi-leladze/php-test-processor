@@ -75,5 +75,19 @@ func (s *JSONStorage) SaveOutput(output *domain.TestResultsOutput) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return fmt.Errorf("create output dir: %w", err)
 	}
-	return os.WriteFile(path, data, 0644)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("create results file: %w", err)
+	}
+	_, err = f.Write(data)
+	if err != nil {
+		f.Close()
+		return fmt.Errorf("write results: %w", err)
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return fmt.Errorf("sync results file: %w", err)
+	}
+	f.Close()
+	return nil
 }
