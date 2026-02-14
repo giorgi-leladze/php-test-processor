@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -34,46 +35,48 @@ func (wp *WorkerPool) SetProgress(progress *ui.ProgressBar) {
 	wp.progress = progress
 }
 
-// Execute executes tests in parallel using worker pool
+// Execute executes tests in parallel using worker pool (no fail-fast).
 func (wp *WorkerPool) Execute(tests []string) ([]domain.TestResult, time.Duration, error) {
+	return wp.ExecuteWithOptions(tests, false)
+}
+
+// ExecuteWithOptions executes tests with optional fail-fast (stop on first failure).
+func (wp *WorkerPool) ExecuteWithOptions(tests []string, failFast bool) ([]domain.TestResult, time.Duration, error) {
 	if len(tests) == 0 {
 		return nil, 0, nil
 	}
+	if !failFast {
+		return wp.executeAll(tests)
+	}
+	return wp.executeFailFast(tests)
+}
 
-	// Create channels for test distribution and results
+// executeAll runs all tests (original behavior).
+func (wp *WorkerPool) executeAll(tests []string) ([]domain.TestResult, time.Duration, error) {
 	testQueue := make(chan string, len(tests))
 	results := make(chan domain.TestResult, len(tests))
-
-	// Send all tests to the queue
 	for _, test := range tests {
 		testQueue <- test
 	}
 	close(testQueue)
 
-	// Track progress: file count for bar position, test case counts for label
 	var mu sync.Mutex
 	var completedFiles int
 	var passedCases, failedCases int
-
 	startTime := time.Now()
-
-	// Create worker pool
-	var wg sync.WaitGroup
 	workerCount := wp.config.Processors
 	if workerCount <= 0 {
 		workerCount = 1
 	}
 
+	var wg sync.WaitGroup
 	for i := 1; i <= workerCount; i++ {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
-
-			// Worker loop: keep processing tests until channel is closed
 			for testPath := range testQueue {
 				result := wp.runner.Run(testPath, workerID)
 				results <- result
-
 				mu.Lock()
 				completedFiles++
 				if wp.parser != nil {
@@ -87,7 +90,6 @@ func (wp *WorkerPool) Execute(tests []string) ([]domain.TestResult, time.Duratio
 						failedCases++
 					}
 				}
-				// Update progress bar if available (bar position = files, label = test cases)
 				if wp.progress != nil {
 					wp.progress.Update(completedFiles, passedCases, failedCases)
 				}
@@ -95,8 +97,6 @@ func (wp *WorkerPool) Execute(tests []string) ([]domain.TestResult, time.Duratio
 			}
 		}(i)
 	}
-
-	// Close results channel when all workers are done
 	go func() {
 		wg.Wait()
 		close(results)
@@ -106,14 +106,91 @@ func (wp *WorkerPool) Execute(tests []string) ([]domain.TestResult, time.Duratio
 	for result := range results {
 		allResults = append(allResults, result)
 	}
-
-	// Finish progress bar if available
 	if wp.progress != nil {
 		wp.progress.Finish()
 	}
+	return allResults, time.Since(startTime), nil
+}
 
-	duration := time.Since(startTime)
+// executeFailFast runs tests and stops after the first failure.
+func (wp *WorkerPool) executeFailFast(tests []string) ([]domain.TestResult, time.Duration, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	return allResults, duration, nil
+	testQueue := make(chan string, 1)
+	results := make(chan domain.TestResult, len(tests))
+
+	go func() {
+		defer close(testQueue)
+		for _, test := range tests {
+			select {
+			case <-ctx.Done():
+				return
+			case testQueue <- test:
+			}
+		}
+	}()
+
+	var mu sync.Mutex
+	var completedFiles int
+	var passedCases, failedCases int
+	var seenFailure bool
+	startTime := time.Now()
+	workerCount := wp.config.Processors
+	if workerCount <= 0 {
+		workerCount = 1
+	}
+
+	var wg sync.WaitGroup
+	for i := 1; i <= workerCount; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			for testPath := range testQueue {
+				result := wp.runner.Run(testPath, workerID)
+				mu.Lock()
+				done := seenFailure
+				mu.Unlock()
+				if done {
+					continue
+				}
+				results <- result
+				mu.Lock()
+				completedFiles++
+				if wp.parser != nil {
+					p, f := wp.parser.ParseTestCounts(result)
+					passedCases += p
+					failedCases += f
+				} else {
+					if result.Success {
+						passedCases++
+					} else {
+						failedCases++
+					}
+				}
+				if wp.progress != nil {
+					wp.progress.Update(completedFiles, passedCases, failedCases)
+				}
+				if !result.Success {
+					seenFailure = true
+					cancel()
+				}
+				mu.Unlock()
+			}
+		}(i)
+	}
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var allResults []domain.TestResult
+	for result := range results {
+		allResults = append(allResults, result)
+	}
+	if wp.progress != nil {
+		wp.progress.Finish()
+	}
+	return allResults, time.Since(startTime), nil
 }
 

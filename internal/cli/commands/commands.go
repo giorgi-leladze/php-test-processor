@@ -4,6 +4,7 @@ import (
 	"ptp/internal/cli"
 	"ptp/internal/config"
 	"ptp/internal/discovery"
+	"ptp/internal/domain"
 	"ptp/internal/execution"
 	"ptp/internal/migration"
 	"ptp/internal/parser"
@@ -35,11 +36,15 @@ func NewCommands(cfg *config.Config) *Commands {
 	formatter := ui.NewFormatter(cfg, testCaseParser)
 	dbManager := migration.NewDatabaseManager(cfg)
 	migrator := migration.NewLaravelMigrator(cfg, dbManager)
+	runCmd := NewRunCommand(cfg, scanner, filter, executor, phpunitParser, jsonStorage, formatter, migrator)
 	errorViewer := ui.NewErrorViewer(cfg, jsonStorage, runner, phpunitParser)
+	errorViewer.RunOnlyFailedAndReload = func() (*domain.TestResultsOutput, error) {
+		return runCmd.RunOnlyFailedAndSave()
+	}
 
 	return &Commands{
-		Run:     NewRunCommand(cfg, scanner, filter, executor, phpunitParser, jsonStorage, formatter, migrator),
-		List:    NewListCommand(cfg, scanner, filter, formatter),
+		Run:     runCmd,
+		List:    NewListCommand(cfg, scanner, filter, formatter, jsonStorage),
 		Migrate: NewMigrateCommand(cfg, migrator),
 		Faills:  NewFaillsCommand(cfg, jsonStorage, errorViewer),
 	}
@@ -67,6 +72,9 @@ func (c *Commands) Register(rootCmd *cobra.Command, flags *cli.Flags, cfg *confi
 	runCmd.Flags().BoolVar(&flags.NoFresh, "no-fresh", false, "Run migrations without fresh (only pending migrations)")
 	runCmd.Flags().StringVarP(&flags.TestPath, "test-path", "t", "", "Path to the folder where test detection should start")
 	runCmd.Flags().StringVarP(&flags.NameFilter, "filter", "f", "", "Filter tests by name pattern (supports wildcards, e.g., '*UserTest.php' or '*Payment*')")
+	runCmd.Flags().BoolVar(&flags.FailFast, "fail-fast", false, "Stop on first test failure")
+	runCmd.Flags().BoolVar(&flags.OnlyFailed, "failed", false, "Run only tests that failed in the last run (from storage/test-results.json)")
+	runCmd.Flags().BoolVar(&flags.RerunFailures, "rerun-failures", false, "After running all tests, rerun only failed ones once and save that result")
 	rootCmd.AddCommand(runCmd)
 
 	// List command

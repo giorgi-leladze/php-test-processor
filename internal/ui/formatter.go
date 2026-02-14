@@ -244,8 +244,22 @@ func (f *Formatter) CountTestCases(tests []string) (int, error) {
 	return total, nil
 }
 
-// PrintTestList prints a list of test files, optionally with test cases
-func (f *Formatter) PrintTestList(tests []string, showTestCases bool) error {
+// normalizedPathForKey returns a path key for matching (same logic as commands package).
+func normalizedPathForKey(projectPath, path string) string {
+	p := path
+	if projectPath != "" {
+		if rel, err := filepath.Rel(projectPath, path); err == nil && rel != ".." && !strings.HasPrefix(rel, "..") {
+			p = rel
+		}
+	}
+	p = filepath.ToSlash(p)
+	p = strings.TrimSuffix(p, ".php")
+	return strings.ToLower(p)
+}
+
+// PrintTestList prints a list of test files, optionally with test cases.
+// failedPaths is optional; if set, files in this set are marked with [F] in red (from last run).
+func (f *Formatter) PrintTestList(tests []string, showTestCases bool, failedPaths map[string]struct{}) error {
 	if showTestCases {
 		// Display tree view with test cases
 		color.Green("Found %d test file(s) with test cases:\n", len(tests))
@@ -263,12 +277,20 @@ func (f *Formatter) PrintTestList(tests []string, showTestCases bool) error {
 				relPath = test
 			}
 
+			failMarker := ""
+			if len(failedPaths) > 0 {
+				key := normalizedPathForKey(f.config.ProjectPath, test)
+				if _, ok := failedPaths[key]; ok {
+					failMarker = " " + color.RedString("[F]")
+				}
+			}
+
 			// Print test file as root node
 			isLastFile := i == len(tests)-1
 			if isLastFile {
-				color.Cyan("└── %s", relPath)
+				color.Cyan("└── %s%s", relPath, failMarker)
 			} else {
-				color.Cyan("├── %s", relPath)
+				color.Cyan("├── %s%s", relPath, failMarker)
 			}
 
 			// Print test cases as children
@@ -319,10 +341,18 @@ func (f *Formatter) PrintTestList(tests []string, showTestCases bool) error {
 				relPath = test
 			}
 
+			failMarker := ""
+			if len(failedPaths) > 0 {
+				key := normalizedPathForKey(f.config.ProjectPath, test)
+				if _, ok := failedPaths[key]; ok {
+					failMarker = " " + color.RedString("[F]")
+				}
+			}
+
 			if i == len(tests)-1 {
-				color.Cyan("└── %s", relPath)
+				color.Cyan("└── %s%s", relPath, failMarker)
 			} else {
-				color.Cyan("├── %s", relPath)
+				color.Cyan("├── %s%s", relPath, failMarker)
 			}
 		}
 	}

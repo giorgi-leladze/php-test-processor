@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 	"ptp/internal/config"
 	"ptp/internal/discovery"
+	"ptp/internal/storage"
 	"ptp/internal/ui"
 )
 
@@ -14,6 +15,7 @@ type ListCommand struct {
 	scanner   *discovery.Scanner
 	filter    *discovery.Filter
 	formatter *ui.Formatter
+	storage   storage.Storage
 }
 
 // NewListCommand creates a new ListCommand
@@ -22,12 +24,14 @@ func NewListCommand(
 	scanner *discovery.Scanner,
 	filter *discovery.Filter,
 	formatter *ui.Formatter,
+	st storage.Storage,
 ) *ListCommand {
 	return &ListCommand{
 		config:    cfg,
 		scanner:   scanner,
 		filter:    filter,
 		formatter: formatter,
+		storage:   st,
 	}
 }
 
@@ -47,6 +51,11 @@ func (lc *ListCommand) Execute(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	return lc.formatter.PrintTestList(tests, lc.config.Flags.TestCases)
+	var failedPaths map[string]struct{}
+	if last, err := lc.storage.Load(); err == nil && last != nil && len(last.Details) > 0 {
+		failedPaths = failedPathsFromOutput(lc.config.ProjectPath, last)
+	}
+
+	return lc.formatter.PrintTestList(tests, lc.config.Flags.TestCases, failedPaths)
 }
 

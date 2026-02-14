@@ -36,12 +36,17 @@ type SingleTestRunner interface {
 	RunFiltered(testPath string, filter string, workerID int) domain.TestResult
 }
 
+// RunOnlyFailedAndReload runs only failed tests from the last run and returns the new results (for faills "R" key).
+type RunOnlyFailedAndReload func() (*domain.TestResultsOutput, error)
+
 // ErrorViewer displays test failures in an interactive TUI
 type ErrorViewer struct {
 	config  *config.Config
 	storage storage.Storage
 	runner  SingleTestRunner
 	parser  *parser.PHPUnitParser
+	// RunOnlyFailedAndReload is optional; when set, "R" runs only failed tests and refreshes the list.
+	RunOnlyFailedAndReload RunOnlyFailedAndReload
 }
 
 // NewErrorViewer creates a new ErrorViewer
@@ -423,17 +428,25 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 	footer.SetBackgroundColor(faillsBorder)
 	footer.SetTextColor(faillsFg)
 
+	runOnlyFailedAvailable := ev.RunOnlyFailedAndReload != nil
 	getFooterForMode := func(mode string) string {
+		baseRerun := "[cyan]r[white] Rerun"
+		if runOnlyFailedAvailable {
+			baseRerun = "[cyan]r[white] Rerun  [cyan]R[white] Run only failed"
+		}
 		switch mode {
 		case "test_cases_filter":
 			return "[cyan]Enter[white] Apply  [cyan]Esc[white] Cancel & clear marks  [cyan]Ctrl+C[white] Quit"
 		case "test_case_view":
 			return "[cyan]←[white]/[cyan]Esc[white] Back to list  [cyan]e[white] Edit in editor  [cyan]Ctrl+C[white] Quit"
 		case "test_cases_list_group_selection":
-			return "[cyan]r[white] Rerun marked  [cyan]e[white] Edit  [cyan]Space[white] Toggle mark  [cyan]Enter[white] View  [cyan]f[white] Filter  [cyan]Esc[white] Clear marks & exit  ↑↓ Navigate  [cyan]Ctrl+C[white] Quit"
+			rerunPart := "[cyan]r[white] Rerun marked"
+			if runOnlyFailedAvailable {
+				rerunPart = "[cyan]r[white] Rerun marked  [cyan]R[white] Run only failed"
+			}
+			return rerunPart + "  [cyan]e[white] Edit  [cyan]Space[white] Toggle mark  [cyan]Enter[white] View  [cyan]f[white] Filter  [cyan]Esc[white] Clear marks & exit  ↑↓ Navigate  [cyan]Ctrl+C[white] Quit"
 		}
-		// test_cases_list and fallback
-		return "[cyan]r[white] Rerun  [cyan]e[white] Edit  [cyan]Space[white] Mark  [cyan]Enter[white] View details  [cyan]f[white] Filter  ↑↓ Navigate  [cyan]Esc[white] Clear marks  [cyan]Ctrl+C[white] Quit"
+		return baseRerun + "  [cyan]e[white] Edit  [cyan]Space[white] Mark  [cyan]Enter[white] View details  [cyan]f[white] Filter  ↑↓ Navigate  [cyan]Esc[white] Clear marks  [cyan]Ctrl+C[white] Quit"
 	}
 
 	updateFooter = func() {
@@ -733,7 +746,40 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 			app.Stop()
 			return nil
 		case tcell.KeyRune:
-			if event.Rune() == 'r' || event.Rune() == 'R' {
+			if event.Rune() == 'R' && ev.RunOnlyFailedAndReload != nil {
+				runOnlyFailed := ev.RunOnlyFailedAndReload
+				app.QueueUpdate(func() {
+					detailsView.SetText("[yellow]Running only failed tests…[white]")
+					updateFooter()
+				})
+				go func() {
+					newOutput, err := runOnlyFailed()
+					app.QueueUpdate(func() {
+						if err != nil {
+							detailsView.SetText("[red]Run only failed failed: " + err.Error() + "[white]")
+							updateFooter()
+							return
+						}
+						if newOutput == nil {
+							detailsView.SetText("[yellow]No previous run or no failed tests to run.[white]")
+							updateFooter()
+							return
+						}
+						results.Meta = newOutput.Meta
+						results.Details = newOutput.Details
+						applyFilter()
+						rebuildList()
+						updateHeaderCounts()
+						updateDetails()
+						updateFooter()
+						if len(results.Details) == 0 {
+							app.Stop()
+						}
+					})
+				}()
+				return nil
+			}
+			if event.Rune() == 'r' {
 				runRerun()
 				return nil
 			}

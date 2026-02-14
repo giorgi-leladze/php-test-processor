@@ -28,13 +28,16 @@ type Config struct {
 
 // Flags holds command-line flags
 type Flags struct {
-	Processors int
-	Filter     string
-	Migrate    bool
-	NoFresh    bool
-	TestPath   string
-	NameFilter string
-	TestCases  bool
+	Processors    int
+	Filter        string
+	Migrate       bool
+	NoFresh       bool
+	TestPath      string
+	NameFilter    string
+	TestCases     bool
+	FailFast      bool
+	OnlyFailed    bool
+	RerunFailures bool
 }
 
 // New creates a new Config with defaults
