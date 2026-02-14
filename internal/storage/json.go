@@ -64,3 +64,16 @@ func (s *JSONStorage) Load() (*domain.TestResultsOutput, error) {
 	}
 	return &output, nil
 }
+
+// SaveOutput writes the full output to the configured JSON file (e.g. after re-running selected tests).
+func (s *JSONStorage) SaveOutput(output *domain.TestResultsOutput) error {
+	data, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal results: %w", err)
+	}
+	path := s.cfg.GetOutputPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("create output dir: %w", err)
+	}
+	return os.WriteFile(path, data, 0644)
+}

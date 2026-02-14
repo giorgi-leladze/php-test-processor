@@ -35,7 +35,7 @@ func NewCommands(cfg *config.Config) *Commands {
 	formatter := ui.NewFormatter(cfg, testCaseParser)
 	dbManager := migration.NewDatabaseManager(cfg)
 	migrator := migration.NewLaravelMigrator(cfg, dbManager)
-	errorViewer := ui.NewErrorViewer(cfg, jsonStorage)
+	errorViewer := ui.NewErrorViewer(cfg, jsonStorage, runner, phpunitParser)
 
 	return &Commands{
 		Run:     NewRunCommand(cfg, scanner, filter, executor, phpunitParser, jsonStorage, formatter, migrator),

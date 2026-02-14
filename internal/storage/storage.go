@@ -11,6 +11,8 @@ import (
 type Storage interface {
 	Save(results []domain.TestResult, failures []domain.TestFailure, duration time.Duration, workers int) error
 	Load() (*domain.TestResultsOutput, error)
+	// SaveOutput writes the full output (e.g. after partial re-run updates).
+	SaveOutput(output *domain.TestResultsOutput) error
 }
 
 // JSONStorage stores results in a JSON file under the configured output path.

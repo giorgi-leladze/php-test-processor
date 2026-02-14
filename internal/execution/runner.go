@@ -22,15 +22,25 @@ func NewRunner(cfg *config.Config) *Runner {
 
 // Run executes PHPUnit for a single test file
 func (r *Runner) Run(testPath string, workerID int) domain.TestResult {
+	return r.run(testPath, "", workerID)
+}
+
+// RunFiltered runs PHPUnit for a single test file with --filter to run one test case (e.g. method name).
+func (r *Runner) RunFiltered(testPath string, filter string, workerID int) domain.TestResult {
+	return r.run(testPath, filter, workerID)
+}
+
+func (r *Runner) run(testPath string, filter string, workerID int) domain.TestResult {
 	phpunitPath := r.config.GetPHPUnitPath()
 	ctx := context.Background()
-	cmd := exec.CommandContext(ctx, phpunitPath, testPath)
+	args := []string{testPath}
+	if filter != "" {
+		args = append(args, "--filter", filter)
+	}
+	cmd := exec.CommandContext(ctx, phpunitPath, args...)
 
-	// Set environment variables
-	cmd.Env = os.Environ() // Start with current environment
+	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, fmt.Sprintf("DB_DATABASE=%s", r.config.GetDatabaseName(workerID)))
-
-	// Set working directory
 	cmd.Dir = r.config.ProjectPath
 
 	output, err := cmd.CombinedOutput()
