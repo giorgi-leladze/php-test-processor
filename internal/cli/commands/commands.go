@@ -38,7 +38,7 @@ func NewCommands(cfg *config.Config) *Commands {
 	errorViewer := ui.NewErrorViewer(cfg, jsonStorage, runner, phpunitParser)
 
 	return &Commands{
-		Run:     NewRunCommand(cfg, scanner, filter, executor, phpunitParser, jsonStorage, formatter, migrator),
+		Run:     NewRunCommand(cfg, scanner, filter, executor, phpunitParser, jsonStorage, formatter, migrator, errorViewer),
 		List:    NewListCommand(cfg, scanner, filter, formatter, jsonStorage),
 		Migrate: NewMigrateCommand(cfg, migrator),
 		Faills:  NewFaillsCommand(cfg, jsonStorage, errorViewer),
@@ -70,6 +70,7 @@ func (c *Commands) Register(rootCmd *cobra.Command, flags *cli.Flags, cfg *confi
 	runCmd.Flags().BoolVar(&flags.FailFast, "fail-fast", false, "Stop on first test failure")
 	runCmd.Flags().BoolVar(&flags.OnlyFailed, "failed", false, "Run only tests that failed in the last run (from storage/test-results.json)")
 	runCmd.Flags().BoolVar(&flags.RerunFailures, "rerun-failures", false, "After running all tests, rerun only failed ones once and save that result")
+	runCmd.Flags().BoolVar(&flags.OpenFaills, "open-faills", false, "Open the faills viewer when the run finishes with failures")
 	rootCmd.AddCommand(runCmd)
 
 	// List command

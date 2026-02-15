@@ -348,12 +348,10 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 	filterInput.SetChangedFunc(func(text string) {
 		filterStr = strings.TrimSpace(text)
 		applyFilter()
-		if len(filteredIndices) == 0 && filterStr != "" {
-			// Zero matches: get out of select/filter mode and show full list
-			hideFilter()
-			return
-		}
 		rebuildList()
+		updateHeaderCounts()
+		updateDetails()
+		updateFooter()
 	})
 
 	// --- Right: details panel (stats + body) ---

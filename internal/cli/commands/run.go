@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"ptp/internal/config"
 	"ptp/internal/discovery"
@@ -41,6 +42,7 @@ type RunCommand struct {
 	storage   storage.Storage
 	formatter *ui.Formatter
 	migrator  migration.Migrator
+	viewer    *ui.ErrorViewer
 }
 
 // NewRunCommand creates a new RunCommand
@@ -53,6 +55,7 @@ func NewRunCommand(
 	st storage.Storage,
 	formatter *ui.Formatter,
 	migrator migration.Migrator,
+	viewer *ui.ErrorViewer,
 ) *RunCommand {
 	return &RunCommand{
 		config:    cfg,
@@ -63,6 +66,7 @@ func NewRunCommand(
 		storage:   st,
 		formatter: formatter,
 		migrator:  migrator,
+		viewer:    viewer,
 	}
 }
 
@@ -224,12 +228,66 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 			if err := rc.storage.Save(results, failures, duration, rc.config.Processors); err != nil {
 				return fmt.Errorf("failed to save test results: %w", err)
 			}
-			return rc.formatter.PrintMetaStats()
+			if err := rc.formatter.PrintMetaStats(); err != nil {
+				return err
+			}
+			if rc.config.Flags.OpenFaills && len(failures) > 0 && rc.viewer != nil {
+				passed, failed := 0, 0
+				for _, r := range results {
+					if r.Success {
+						passed++
+					} else {
+						failed++
+					}
+				}
+				output := &domain.TestResultsOutput{
+					Meta: domain.TestResultsMeta{
+						TotalTestFiles:  len(results),
+						FailedTestFiles: failed,
+						PassedTestFiles: passed,
+						FailedTestCases: len(failures),
+						Duration:        duration.String(),
+						DurationSeconds: duration.Seconds(),
+						Workers:         rc.config.Processors,
+						Timestamp:       time.Now().Format(time.RFC3339),
+					},
+					Details: failures,
+				}
+				return rc.viewer.View(output)
+			}
+			return nil
 		}
 	}
 
 	if err := rc.storage.Save(results, failures, duration, rc.config.Processors); err != nil {
 		return fmt.Errorf("failed to save test results: %w", err)
 	}
-	return rc.formatter.PrintMetaStats()
+	if err := rc.formatter.PrintMetaStats(); err != nil {
+		return err
+	}
+	if rc.config.Flags.OpenFaills && len(failures) > 0 && rc.viewer != nil {
+		passed, failed := 0, 0
+		for _, r := range results {
+			if r.Success {
+				passed++
+			} else {
+				failed++
+			}
+		}
+		output := &domain.TestResultsOutput{
+			Meta: domain.TestResultsMeta{
+				TotalTestFiles:  len(results),
+				FailedTestFiles: failed,
+				PassedTestFiles: passed,
+				FailedTestCases: len(failures),
+				Duration:        duration.String(),
+				DurationSeconds: duration.Seconds(),
+				Workers:         rc.config.Processors,
+				Timestamp:       time.Now().Format(time.RFC3339),
+			},
+			Details: failures,
+		}
+		return rc.viewer.View(output)
+	}
+	return nil
 }

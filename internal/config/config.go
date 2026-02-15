@@ -38,6 +38,7 @@ type Flags struct {
 	FailFast      bool
 	OnlyFailed    bool
 	RerunFailures bool
+	OpenFaills    bool // after run, open faills viewer if there are failures
 }
 
 // New creates a new Config with defaults

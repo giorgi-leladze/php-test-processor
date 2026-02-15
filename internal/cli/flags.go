@@ -14,6 +14,7 @@ type Flags struct {
 	FailFast      bool
 	OnlyFailed    bool
 	RerunFailures bool
+	OpenFaills    bool
 }
 
 // ToConfigFlags converts CLI flags to config flags
@@ -29,6 +30,7 @@ func (f *Flags) ToConfigFlags() config.Flags {
 		FailFast:      f.FailFast,
 		OnlyFailed:    f.OnlyFailed,
 		RerunFailures: f.RerunFailures,
+		OpenFaills:    f.OpenFaills,
 	}
 }
 
