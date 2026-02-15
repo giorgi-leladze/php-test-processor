@@ -4,7 +4,6 @@ import (
 	"ptp/internal/cli"
 	"ptp/internal/config"
 	"ptp/internal/discovery"
-	"ptp/internal/domain"
 	"ptp/internal/execution"
 	"ptp/internal/migration"
 	"ptp/internal/parser"
@@ -36,14 +35,10 @@ func NewCommands(cfg *config.Config) *Commands {
 	formatter := ui.NewFormatter(cfg, testCaseParser)
 	dbManager := migration.NewDatabaseManager(cfg)
 	migrator := migration.NewLaravelMigrator(cfg, dbManager)
-	runCmd := NewRunCommand(cfg, scanner, filter, executor, phpunitParser, jsonStorage, formatter, migrator)
 	errorViewer := ui.NewErrorViewer(cfg, jsonStorage, runner, phpunitParser)
-	errorViewer.RunOnlyFailedAndReload = func() (*domain.TestResultsOutput, error) {
-		return runCmd.RunOnlyFailedAndSave()
-	}
 
 	return &Commands{
-		Run:     runCmd,
+		Run:     NewRunCommand(cfg, scanner, filter, executor, phpunitParser, jsonStorage, formatter, migrator),
 		List:    NewListCommand(cfg, scanner, filter, formatter, jsonStorage),
 		Migrate: NewMigrateCommand(cfg, migrator),
 		Faills:  NewFaillsCommand(cfg, jsonStorage, errorViewer),

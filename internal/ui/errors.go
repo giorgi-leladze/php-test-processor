@@ -36,17 +36,12 @@ type SingleTestRunner interface {
 	RunFiltered(testPath string, filter string, workerID int) domain.TestResult
 }
 
-// RunOnlyFailedAndReload runs only failed tests from the last run and returns the new results (for faills "R" key).
-type RunOnlyFailedAndReload func() (*domain.TestResultsOutput, error)
-
 // ErrorViewer displays test failures in an interactive TUI
 type ErrorViewer struct {
 	config  *config.Config
 	storage storage.Storage
 	runner  SingleTestRunner
 	parser  *parser.PHPUnitParser
-	// RunOnlyFailedAndReload is optional; when set, "R" runs only failed tests and refreshes the list.
-	RunOnlyFailedAndReload RunOnlyFailedAndReload
 }
 
 // NewErrorViewer creates a new ErrorViewer
@@ -428,25 +423,19 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 	footer.SetBackgroundColor(faillsBorder)
 	footer.SetTextColor(faillsFg)
 
-	runOnlyFailedAvailable := ev.RunOnlyFailedAndReload != nil
+	// Use hex [#00bcd4] for accent (same as faillsAccent) so footer colors render in all terminals
+	keyStyle := "[#00bcd4]"
+	resetStyle := "[#e0e0e0]" // faillsFg-like
 	getFooterForMode := func(mode string) string {
-		baseRerun := "[cyan]r[white] Rerun"
-		if runOnlyFailedAvailable {
-			baseRerun = "[cyan]r[white] Rerun  [cyan]R[white] Run only failed"
-		}
 		switch mode {
 		case "test_cases_filter":
-			return "[cyan]Enter[white] Apply  [cyan]Esc[white] Cancel & clear marks  [cyan]Ctrl+C[white] Quit"
+			return keyStyle + "Enter" + resetStyle + " Apply  " + keyStyle + "Esc" + resetStyle + " Cancel & clear marks  " + keyStyle + "Ctrl+C" + resetStyle + " Quit"
 		case "test_case_view":
-			return "[cyan]←[white]/[cyan]Esc[white] Back to list  [cyan]e[white] Edit in editor  [cyan]Ctrl+C[white] Quit"
+			return keyStyle + "←" + resetStyle + "/" + keyStyle + "Esc" + resetStyle + " Back to list  " + keyStyle + "e" + resetStyle + " Edit in editor  " + keyStyle + "Ctrl+C" + resetStyle + " Quit"
 		case "test_cases_list_group_selection":
-			rerunPart := "[cyan]r[white] Rerun marked"
-			if runOnlyFailedAvailable {
-				rerunPart = "[cyan]r[white] Rerun marked  [cyan]R[white] Run only failed"
-			}
-			return rerunPart + "  [cyan]e[white] Edit  [cyan]Space[white] Toggle mark  [cyan]Enter[white] View  [cyan]f[white] Filter  [cyan]Esc[white] Clear marks & exit  ↑↓ Navigate  [cyan]Ctrl+C[white] Quit"
+			return keyStyle + "r" + resetStyle + " Rerun marked  " + keyStyle + "e" + resetStyle + " Edit  " + keyStyle + "Space" + resetStyle + " Toggle mark  " + keyStyle + "Enter" + resetStyle + " View  " + keyStyle + "f" + resetStyle + " Filter  " + keyStyle + "Esc" + resetStyle + " Clear marks & exit  " + keyStyle + "↑↓" + resetStyle + " Navigate  " + keyStyle + "Ctrl+C" + resetStyle + " Quit"
 		}
-		return baseRerun + "  [cyan]e[white] Edit  [cyan]Space[white] Mark  [cyan]Enter[white] View details  [cyan]f[white] Filter  ↑↓ Navigate  [cyan]Esc[white] Clear marks  [cyan]Ctrl+C[white] Quit"
+		return keyStyle + "r" + resetStyle + " Rerun  " + keyStyle + "e" + resetStyle + " Edit  " + keyStyle + "Space" + resetStyle + " Mark  " + keyStyle + "Enter" + resetStyle + " View details  " + keyStyle + "f" + resetStyle + " Filter  " + keyStyle + "↑↓" + resetStyle + " Navigate  " + keyStyle + "Esc" + resetStyle + " Clear marks  " + keyStyle + "Ctrl+C" + resetStyle + " Quit"
 	}
 
 	updateFooter = func() {
@@ -553,12 +542,18 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 		return true
 	}
 
-	// --- Root layout ---
+	// --- Root layout (wrap in frame for cyan border on all sides) ---
 	root := tview.NewFlex().
 		SetDirection(tview.FlexRow).
 		AddItem(headerFlex, 2, 0, false).
 		AddItem(mainFlex, 0, 1, true).
 		AddItem(footer, 1, 0, false)
+
+	outer := tview.NewFrame(root)
+	outer.SetBorder(true)
+	outer.SetBorderColor(faillsAccent)
+	outer.SetBorders(1, 1, 0, 0, 1, 1)
+	outer.SetBackgroundColor(faillsBgDark)
 
 	filterInput.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
@@ -746,39 +741,6 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 			app.Stop()
 			return nil
 		case tcell.KeyRune:
-			if event.Rune() == 'R' && ev.RunOnlyFailedAndReload != nil {
-				runOnlyFailed := ev.RunOnlyFailedAndReload
-				app.QueueUpdate(func() {
-					detailsView.SetText("[yellow]Running only failed tests…[white]")
-					updateFooter()
-				})
-				go func() {
-					newOutput, err := runOnlyFailed()
-					app.QueueUpdate(func() {
-						if err != nil {
-							detailsView.SetText("[red]Run only failed failed: " + err.Error() + "[white]")
-							updateFooter()
-							return
-						}
-						if newOutput == nil {
-							detailsView.SetText("[yellow]No previous run or no failed tests to run.[white]")
-							updateFooter()
-							return
-						}
-						results.Meta = newOutput.Meta
-						results.Details = newOutput.Details
-						applyFilter()
-						rebuildList()
-						updateHeaderCounts()
-						updateDetails()
-						updateFooter()
-						if len(results.Details) == 0 {
-							app.Stop()
-						}
-					})
-				}()
-				return nil
-			}
 			if event.Rune() == 'r' {
 				runRerun()
 				return nil
@@ -829,7 +791,7 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 	})
 
 	updateDetails()
-	if err := app.SetRoot(root, true).SetFocus(list).Run(); err != nil {
+	if err := app.SetRoot(outer, true).SetFocus(list).Run(); err != nil {
 		return fmt.Errorf("failed to run TUI: %w", err)
 	}
 	return nil
