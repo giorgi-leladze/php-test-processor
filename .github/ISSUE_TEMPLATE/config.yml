@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Discussions
+    url: https://github.com/giorgi-leladze/php-test-processor/discussions
+    about: Ask questions or share ideas
+  - name: Documentation
+    url: https://github.com/giorgi-leladze/php-test-processor#readme
+    about: Read the README
