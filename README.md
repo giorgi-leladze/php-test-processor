@@ -62,33 +62,6 @@ chmod +x ptp
 sudo mv ptp /usr/local/bin/
 ```
 
-### Option 3: Install via Composer (Laravel / PHP projects)
-
-Install PTP as a dev dependency; the correct binary for your OS will be downloaded automatically. **Allow the plugin first** so `composer ptp` is available:
-
-```bash
-# 1. Allow the plugin (required for composer ptp to work)
-composer config allow-plugins.giorgi-leladze/ptp true
-
-# 2. Require the package (stable when available)
-composer require giorgi-leladze/ptp --dev
-
-# If no stable tag exists yet, use:
-composer require giorgi-leladze/ptp:dev-main --dev
-```
-
-Then run PTP via Composer (no extra config needed):
-
-```bash
-composer ptp run
-composer ptp list
-composer ptp -- run --processors 8
-```
-
-Or use the binary directly: `vendor/bin/ptp run`
-
-**If `composer ptp` is not found:** run `composer config allow-plugins.giorgi-leladze/ptp true` in your project root, then `composer update`. The plugin must be allowed for the command to appear.
-
 ### Option 4: Install via Go Install
 
 ```bash
