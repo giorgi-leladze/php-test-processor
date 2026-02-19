@@ -1,9 +1,10 @@
 ---
 name: Feature request
-description: Suggest an idea or improvement
+about: Describes new fature for the tool
 title: "[Feature] "
 labels: enhancement
-assignees: ""
+assignees: ''
+
 ---
 
 ## Problem or motivation

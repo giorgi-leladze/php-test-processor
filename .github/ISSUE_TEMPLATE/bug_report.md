@@ -1,9 +1,10 @@
 ---
 name: Bug report
-description: Something isn't working as expected
+about: Describes bug in the tool
 title: "[Bug] "
-labels: bug
-assignees: ""
+labels: bug, enhancement
+assignees: giorgi-leladze
+
 ---
 
 ## Describe the bug
