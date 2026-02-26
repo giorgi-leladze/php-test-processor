@@ -155,6 +155,7 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 	var updateFooter func() // set after footer is created; used by showFilter/hideFilter
 
 	app := tview.NewApplication()
+	app.EnableMouse(true)
 
 	// --- Theme: dark background and consistent colors ---
 	app.SetBeforeDrawFunc(func(screen tcell.Screen) bool {
@@ -319,6 +320,20 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 		SetTitleAlign(tview.AlignLeft)
 	list.SetBackgroundColor(faillsBgDark)
 
+	list.SetMouseCapture(func(action tview.MouseAction, event *tcell.EventMouse) (tview.MouseAction, *tcell.EventMouse) {
+		switch action {
+		case tview.MouseScrollUp:
+			if list.GetCurrentItem() == 0 {
+				return action, nil
+			}
+		case tview.MouseScrollDown:
+			if list.GetCurrentItem() >= list.GetItemCount()-1 {
+				return action, nil
+			}
+		}
+		return action, event
+	})
+
 	// Left column: either list only, or filter row + list (when "f" opens filter)
 	leftColWithFilter := tview.NewFlex().
 		SetDirection(tview.FlexRow).
@@ -365,6 +380,7 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 		SetDynamicColors(true).
 		SetWrap(true).
 		SetWordWrap(true).
+		SetScrollable(true).
 		SetTextColor(faillsFg)
 	detailsView.SetBackgroundColor(faillsBgDark)
 
@@ -726,7 +742,15 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 			return nil
 		}
 		switch event.Key() {
-		case tcell.KeyUp, tcell.KeyDown:
+		case tcell.KeyUp:
+			if list.GetCurrentItem() == 0 {
+				return nil
+			}
+			return event
+		case tcell.KeyDown:
+			if list.GetCurrentItem() >= list.GetItemCount()-1 {
+				return nil
+			}
 			return event
 		case tcell.KeyEsc:
 			hideFilter() // clear all marks and exit select/filter mode
