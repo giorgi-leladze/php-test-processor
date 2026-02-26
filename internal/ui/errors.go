@@ -323,13 +323,15 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 	list.SetMouseCapture(func(action tview.MouseAction, event *tcell.EventMouse) (tview.MouseAction, *tcell.EventMouse) {
 		switch action {
 		case tview.MouseScrollUp:
-			if list.GetCurrentItem() == 0 {
-				return action, nil
+			if cur := list.GetCurrentItem(); cur > 0 {
+				list.SetCurrentItem(cur - 1)
 			}
+			return action, nil
 		case tview.MouseScrollDown:
-			if list.GetCurrentItem() >= list.GetItemCount()-1 {
-				return action, nil
+			if cur := list.GetCurrentItem(); cur < list.GetItemCount()-1 {
+				list.SetCurrentItem(cur + 1)
 			}
+			return action, nil
 		}
 		return action, event
 	})
