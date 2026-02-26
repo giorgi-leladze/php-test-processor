@@ -325,11 +325,13 @@ func (ev *ErrorViewer) View(results *domain.TestResultsOutput) error {
 		case tview.MouseScrollUp:
 			if cur := list.GetCurrentItem(); cur > 0 {
 				list.SetCurrentItem(cur - 1)
+				go app.Draw()
 			}
 			return action, nil
 		case tview.MouseScrollDown:
 			if cur := list.GetCurrentItem(); cur < list.GetItemCount()-1 {
 				list.SetCurrentItem(cur + 1)
+				go app.Draw()
 			}
 			return action, nil
 		}
