@@ -38,9 +38,9 @@ curl -sL https://github.com/giorgi-leladze/php-test-processor/releases/latest/do
 curl -sL https://github.com/giorgi-leladze/php-test-processor/releases/latest/download/ptp-darwin-amd64.tar.gz | tar -xz && sudo mv ptp-darwin-amd64 /usr/local/bin/ptp && chmod +x /usr/local/bin/ptp
 ```
 
-**macOS Apple Silicon (M1/M2/M3):**
+**macOS Apple Silicon (M1/M2/M3/M4):**
 ```bash
-curl -sL https://github.com/giorgi-leladze/php-test-processor/releases/latest/download/ptp-darwin-arm64.tar.gz | tar -xz && sudo mv ptp-darwin-arm64 /usr/local/bin/ptp && chmod +x /usr/local/bin/ptp
+curl -sL https://github.com/giorgi-leladze/php-test-processor/releases/latest/download/ptp-darwin-arm64.tar.gz | tar -xz && sudo mv ptp-darwin-arm64 /opt/homebrew/bin/ptp && chmod +x /usr/local/bin/ptp
 ```
 
 Or visit the [Releases](https://github.com/giorgi-leladze/php-test-processor/releases) page to download manually.
