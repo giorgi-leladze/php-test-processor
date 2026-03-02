@@ -23,6 +23,8 @@ func (s *JSONStorage) Save(results []domain.TestResult, failures []domain.TestFa
 		}
 	}
 
+	timings := s.mergeTimings(results)
+
 	output := domain.TestResultsOutput{
 		Meta: domain.TestResultsMeta{
 			TotalTestFiles:  len(results),
@@ -35,6 +37,7 @@ func (s *JSONStorage) Save(results []domain.TestResult, failures []domain.TestFa
 			Timestamp:       time.Now().Format(time.RFC3339),
 		},
 		Details: failures,
+		Timings: timings,
 	}
 
 	data, err := json.MarshalIndent(output, "", "  ")
@@ -72,6 +75,40 @@ func (s *JSONStorage) Load() (*domain.TestResultsOutput, error) {
 	}
 	debug.Logf("storage: loaded %d failures, %d total test files", len(output.Details), output.Meta.TotalTestFiles)
 	return &output, nil
+}
+
+// mergeTimings loads historical timings and merges in new results using a running average.
+func (s *JSONStorage) mergeTimings(results []domain.TestResult) map[string]*domain.TestTiming {
+	timings := make(map[string]*domain.TestTiming)
+
+	prev, err := s.Load()
+	if err == nil && prev != nil && prev.Timings != nil {
+		for k, v := range prev.Timings {
+			cp := *v
+			timings[k] = &cp
+		}
+	}
+
+	for _, r := range results {
+		dur := r.Duration.Seconds()
+		if t, ok := timings[r.TestPath]; ok {
+			t.Avg = (float64(t.Count)*t.Avg + dur) / float64(t.Count+1)
+			t.Count++
+		} else {
+			timings[r.TestPath] = &domain.TestTiming{Count: 1, Avg: dur}
+		}
+	}
+
+	return timings
+}
+
+// LoadTimings returns historical per-test timing data, or nil if unavailable.
+func (s *JSONStorage) LoadTimings() map[string]*domain.TestTiming {
+	prev, err := s.Load()
+	if err != nil || prev == nil {
+		return nil
+	}
+	return prev.Timings
 }
 
 // SaveOutput writes the full output to the configured JSON file (e.g. after re-running selected tests).

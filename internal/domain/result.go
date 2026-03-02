@@ -23,9 +23,16 @@ type TestResultsMeta struct {
 	Timestamp       string  `json:"timestamp"`
 }
 
+// TestTiming tracks the running average execution time for a test file.
+type TestTiming struct {
+	Count int     `json:"count"`
+	Avg   float64 `json:"avg"`
+}
+
 // TestResultsOutput is the complete output structure for test results
 type TestResultsOutput struct {
-	Meta    TestResultsMeta `json:"meta"`
-	Details []TestFailure   `json:"details"`
+	Meta    TestResultsMeta        `json:"meta"`
+	Details []TestFailure          `json:"details"`
+	Timings map[string]*TestTiming `json:"timings,omitempty"`
 }
 

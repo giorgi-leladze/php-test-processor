@@ -13,6 +13,8 @@ type Storage interface {
 	Load() (*domain.TestResultsOutput, error)
 	// SaveOutput writes the full output (e.g. after partial re-run updates).
 	SaveOutput(output *domain.TestResultsOutput) error
+	// LoadTimings returns historical per-test timing data (nil map if unavailable).
+	LoadTimings() map[string]*domain.TestTiming
 }
 
 // JSONStorage stores results in a JSON file under the configured output path.

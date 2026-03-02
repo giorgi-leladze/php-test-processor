@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 
 	"ptp/internal/config"
 	"ptp/internal/debug"
@@ -45,9 +46,15 @@ func (r *Runner) run(testPath string, filter string, workerID int) domain.TestRe
 	cmd.Dir = r.config.ProjectPath
 
 	debug.Logf("runner[w%d]: exec %s %v (dir=%s, db=%s)", workerID, phpunitPath, args, r.config.ProjectPath, r.config.GetDatabaseName(workerID))
+
+	st := time.Now()
 	output, err := cmd.CombinedOutput()
+	dur := time.Since(st)
+
 	if err != nil {
-		debug.Logf("runner[w%d]: FAILED %s: %v", workerID, testPath, err)
+		debug.Logf("runner[w%d]: FAILED %s in %.2fs: %v", workerID, testPath, dur.Seconds(), err)
+	} else {
+		debug.Logf("runner[w%d]: PASSED %s in %.2fs", workerID, testPath, dur.Seconds())
 	}
 
 	return domain.TestResult{
@@ -55,6 +62,6 @@ func (r *Runner) run(testPath string, filter string, workerID int) domain.TestRe
 		Success:  err == nil,
 		Output:   string(output),
 		Error:    err,
+		Duration: dur,
 	}
 }
-

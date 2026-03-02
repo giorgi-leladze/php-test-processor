@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -91,6 +92,25 @@ func failedPathsFromFailures(projectPath string, failures []domain.TestFailure) 
 	return set
 }
 
+// sortTestsByTimings sorts tests with the slowest (highest avg) first so they get
+// dispatched early and don't become a tail bottleneck in the worker pool.
+func sortTestsByTimings(tests []string, timings map[string]*domain.TestTiming) {
+	if len(timings) == 0 {
+		return
+	}
+	sort.Slice(tests, func(i, j int) bool {
+		ai, bi := timings[tests[i]], timings[tests[j]]
+		var avgI, avgJ float64
+		if ai != nil {
+			avgI = ai.Avg
+		}
+		if bi != nil {
+			avgJ = bi.Avg
+		}
+		return avgI > avgJ
+	})
+}
+
 // filterTestsToFailed returns only tests whose normalized path is in the failed set.
 func filterTestsToFailed(projectPath string, tests []string, failedSet map[string]struct{}) []string {
 	var out []string
@@ -121,6 +141,7 @@ func (rc *RunCommand) RunOnlyFailedAndSave() (*domain.TestResultsOutput, error) 
 	if len(tests) == 0 {
 		return nil, nil
 	}
+	sortTestsByTimings(tests, rc.storage.LoadTimings())
 	rc.executor.SetProgress(nil)
 	results, duration, err := rc.executor.ExecuteWithOptions(tests, rc.config.Flags.FailFast)
 	if err != nil {
@@ -207,6 +228,10 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 		color.Yellow("No tests to execute")
 		return nil
 	}
+
+	timings := rc.storage.LoadTimings()
+	sortTestsByTimings(tests, timings)
+	debug.Logf("run: sorted %d tests by historical duration (slowest first)", len(tests))
 
 	if !debug.IsEnabled() {
 		testCaseCount, _ := rc.formatter.CountTestCases(tests)
