@@ -152,7 +152,9 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("migration failed: %w", err)
 		}
 		debug.Log("run: migrations completed")
-		fmt.Println()
+		if !debug.IsEnabled() {
+			fmt.Println()
+		}
 	}
 
 	projectPath := rc.config.ProjectPath
@@ -206,9 +208,11 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	testCaseCount, _ := rc.formatter.CountTestCases(tests)
-	progressBar := ui.NewProgressBar(len(tests), testCaseCount)
-	rc.executor.SetProgress(progressBar)
+	if !debug.IsEnabled() {
+		testCaseCount, _ := rc.formatter.CountTestCases(tests)
+		progressBar := ui.NewProgressBar(len(tests), testCaseCount)
+		rc.executor.SetProgress(progressBar)
+	}
 
 	debug.Logf("run: executing %d tests (failFast=%v, workers=%d)", len(tests), failFast, rc.config.Processors)
 	results, duration, err := rc.executor.ExecuteWithOptions(tests, failFast)
@@ -231,8 +235,10 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 		failedSet := failedPathsFromFailures(projectPath, failures)
 		rerunTests := filterTestsToFailed(projectPath, tests, failedSet)
 		if len(rerunTests) > 0 {
-			progressBar2 := ui.NewProgressBar(len(rerunTests), 0)
-			rc.executor.SetProgress(progressBar2)
+			if !debug.IsEnabled() {
+				progressBar2 := ui.NewProgressBar(len(rerunTests), 0)
+				rc.executor.SetProgress(progressBar2)
+			}
 			results2, duration2, err2 := rc.executor.ExecuteWithOptions(rerunTests, failFast)
 			if err2 != nil {
 				return err2

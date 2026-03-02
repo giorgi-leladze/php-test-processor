@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,9 +35,13 @@ func NewLaravelMigrator(cfg *config.Config, dbManager *DatabaseManager) *Laravel
 
 // Run executes migrations in parallel for all workers
 func (lm *LaravelMigrator) Run(workerCount int, noFresh bool) error {
-	color.Cyan("\n╔════════════════════════════════════════════════════════════╗")
-	color.Cyan("║               Running Database Migrations                  ║")
-	color.Cyan("╚════════════════════════════════════════════════════════════╝\n")
+	quiet := debug.IsEnabled()
+
+	if !quiet {
+		color.Cyan("\n╔════════════════════════════════════════════════════════════╗")
+		color.Cyan("║               Running Database Migrations                  ║")
+		color.Cyan("╚════════════════════════════════════════════════════════════╝\n")
+	}
 
 	debug.Logf("migration: checking/creating databases for %d workers", workerCount)
 	availableWorkers, err := lm.databaseManager.CheckAndCreateDatabases(workerCount)
@@ -61,34 +66,42 @@ func (lm *LaravelMigrator) Run(workerCount int, noFresh bool) error {
 	migrationCount := len(migrationFiles)
 	totalProgress := len(availableWorkers) * migrationCount
 
-	color.White("Workers: %d | Migration files: %d | Total progress: %d\n\n", len(availableWorkers), migrationCount, totalProgress)
+	if !quiet {
+		color.White("Workers: %d | Migration files: %d | Total progress: %d\n\n", len(availableWorkers), migrationCount, totalProgress)
+	}
 
-	// Create progress bar
 	var progressMu sync.Mutex
 	completedCount := 0
 
-	bar := progressbar.NewOptions(totalProgress,
-		progressbar.OptionSetDescription(
-			color.CyanString("Migrating: ")+
-				color.GreenString("[completed: 0/%d]", totalProgress),
-		),
-		progressbar.OptionSetWidth(50),
-		progressbar.OptionSetTheme(progressbar.Theme{
-			Saucer:        color.CyanString("█"),
-			SaucerHead:    color.CyanString("█"),
-			SaucerPadding: "░",
-			BarStart:      "│",
-			BarEnd:        "│",
-		}),
-		progressbar.OptionEnableColorCodes(true),
-		progressbar.OptionSetWriter(os.Stderr),
-		progressbar.OptionOnCompletion(func() {
-			fmt.Fprint(os.Stderr, "\n")
-		}),
-		progressbar.OptionSetRenderBlankState(true),
-	)
+	var bar *progressbar.ProgressBar
+	if quiet {
+		bar = progressbar.NewOptions(totalProgress,
+			progressbar.OptionSetWriter(io.Discard),
+			progressbar.OptionSetVisibility(false),
+		)
+	} else {
+		bar = progressbar.NewOptions(totalProgress,
+			progressbar.OptionSetDescription(
+				color.CyanString("Migrating: ")+
+					color.GreenString("[completed: 0/%d]", totalProgress),
+			),
+			progressbar.OptionSetWidth(50),
+			progressbar.OptionSetTheme(progressbar.Theme{
+				Saucer:        color.CyanString("█"),
+				SaucerHead:    color.CyanString("█"),
+				SaucerPadding: "░",
+				BarStart:      "│",
+				BarEnd:        "│",
+			}),
+			progressbar.OptionEnableColorCodes(true),
+			progressbar.OptionSetWriter(os.Stderr),
+			progressbar.OptionOnCompletion(func() {
+				fmt.Fprint(os.Stderr, "\n")
+			}),
+			progressbar.OptionSetRenderBlankState(true),
+		)
+	}
 
-	// Start workers
 	var wg sync.WaitGroup
 	results := make(chan domain.MigrationResult, len(availableWorkers))
 	startTime := time.Now()
@@ -102,13 +115,11 @@ func (lm *LaravelMigrator) Run(workerCount int, noFresh bool) error {
 		}(workerID)
 	}
 
-	// Close results channel when all workers are done
 	go func() {
 		wg.Wait()
 		close(results)
 	}()
 
-	// Collect results
 	var failedMigrations []domain.MigrationResult
 	for result := range results {
 		if !result.Success {
@@ -116,21 +127,23 @@ func (lm *LaravelMigrator) Run(workerCount int, noFresh bool) error {
 		}
 	}
 
-	// Finish progress bar
 	bar.Finish()
 
 	duration := time.Since(startTime)
 
-	// Print summary
-	fmt.Print("\n")
-	if len(failedMigrations) == 0 {
-		color.Green("✓ Migrations completed successfully for all %d workers\n", len(availableWorkers))
-		color.White("Duration: %s\n", duration.Round(time.Millisecond))
-	} else {
-		color.Red("✗ Migration failed for %d worker(s)\n", len(failedMigrations))
-		for _, result := range failedMigrations {
-			color.Red("  Worker %d (DB: %s): %v\n", result.WorkerID, lm.config.GetDatabaseName(result.WorkerID), result.Error)
+	if !quiet {
+		fmt.Print("\n")
+		if len(failedMigrations) == 0 {
+			color.Green("✓ Migrations completed successfully for all %d workers\n", len(availableWorkers))
+			color.White("Duration: %s\n", duration.Round(time.Millisecond))
+		} else {
+			color.Red("✗ Migration failed for %d worker(s)\n", len(failedMigrations))
+			for _, result := range failedMigrations {
+				color.Red("  Worker %d (DB: %s): %v\n", result.WorkerID, lm.config.GetDatabaseName(result.WorkerID), result.Error)
+			}
 		}
+	}
+	if len(failedMigrations) > 0 {
 		return fmt.Errorf("migration failed for %d worker(s)", len(failedMigrations))
 	}
 
