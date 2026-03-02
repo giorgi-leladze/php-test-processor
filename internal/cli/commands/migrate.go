@@ -1,9 +1,11 @@
 package commands
 
 import (
-	"github.com/spf13/cobra"
 	"ptp/internal/config"
+	"ptp/internal/debug"
 	"ptp/internal/migration"
+
+	"github.com/spf13/cobra"
 )
 
 // MigrateCommand handles the migrate command
@@ -23,6 +25,12 @@ func NewMigrateCommand(cfg *config.Config, migrator migration.Migrator) *Migrate
 // Execute runs the command
 func (mc *MigrateCommand) Execute(cmd *cobra.Command, args []string) error {
 	workerCount := mc.config.Processors
-	return mc.migrator.Run(workerCount, mc.config.Flags.NoFresh)
+	debug.Logf("migrate: starting (workers=%d, noFresh=%v)", workerCount, mc.config.Flags.NoFresh)
+	if err := mc.migrator.Run(workerCount, mc.config.Flags.NoFresh); err != nil {
+		debug.Logf("migrate: failed: %v", err)
+		return err
+	}
+	debug.Log("migrate: completed successfully")
+	return nil
 }
 

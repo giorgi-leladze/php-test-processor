@@ -1,10 +1,12 @@
 package commands
 
 import (
-	"github.com/spf13/cobra"
 	"ptp/internal/config"
+	"ptp/internal/debug"
 	"ptp/internal/storage"
 	"ptp/internal/ui"
+
+	"github.com/spf13/cobra"
 )
 
 // FaillsCommand handles the faills command
@@ -25,11 +27,13 @@ func NewFaillsCommand(cfg *config.Config, st storage.Storage, viewer *ui.ErrorVi
 
 // Execute runs the command
 func (fc *FaillsCommand) Execute(cmd *cobra.Command, args []string) error {
+	debug.Log("faills: loading results from storage")
 	results, err := fc.storage.Load()
 	if err != nil {
+		debug.Logf("faills: failed to load results: %v", err)
 		return err
 	}
-
+	debug.Logf("faills: loaded %d failure details", len(results.Details))
 	return fc.viewer.View(results)
 }
 

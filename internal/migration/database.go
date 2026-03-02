@@ -10,6 +10,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
 	"ptp/internal/config"
+	"ptp/internal/debug"
 )
 
 // DatabaseManager manages test databases
@@ -24,14 +25,12 @@ func NewDatabaseManager(cfg *config.Config) *DatabaseManager {
 
 // CheckAndCreateDatabases checks if test databases exist and creates them if they don't
 func (dm *DatabaseManager) CheckAndCreateDatabases(workerCount int) ([]int, error) {
-	// Load .env file from project directory
 	envPath := filepath.Join(dm.config.ProjectPath, ".env")
+	debug.Logf("db: loading env from %s", envPath)
 	if err := godotenv.Load(envPath); err != nil {
-		// .env file might not exist, that's okay - use environment variables
-		_ = err
+		debug.Logf("db: .env not loaded: %v (falling back to environment)", err)
 	}
 
-	// Get database connection info from environment or use defaults
 	dbHost := os.Getenv("DB_HOST")
 	if dbHost == "" {
 		dbHost = "127.0.0.1"
@@ -49,18 +48,20 @@ func (dm *DatabaseManager) CheckAndCreateDatabases(workerCount int) ([]int, erro
 		dbPassword = ""
 	}
 
-	// Connect to MySQL server (without specifying database)
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/", dbUser, dbPassword, dbHost, dbPort)
+	debug.Logf("db: connecting to %s@tcp(%s:%s)/", dbUser, dbHost, dbPort)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
+		debug.Logf("db: connection open failed: %v", err)
 		return nil, fmt.Errorf("failed to connect to database server: %w", err)
 	}
 	defer db.Close()
 
-	// Test connection
 	if err := db.Ping(); err != nil {
+		debug.Logf("db: ping failed: %v", err)
 		return nil, fmt.Errorf("failed to ping database server: %w", err)
 	}
+	debug.Log("db: connection established")
 
 	availableWorkers := make([]int, 0, workerCount)
 	var createdCount int
@@ -68,15 +69,16 @@ func (dm *DatabaseManager) CheckAndCreateDatabases(workerCount int) ([]int, erro
 	for i := 1; i <= workerCount; i++ {
 		dbName := dm.config.GetDatabaseName(i)
 
-		// Check if database exists
 		exists, err := dm.databaseExists(db, dbName)
 		if err != nil {
+			debug.Logf("db: failed to check database %s: %v", dbName, err)
 			return nil, fmt.Errorf("failed to check database %s: %w", dbName, err)
 		}
 
 		if !exists {
-			// Create database
+			debug.Logf("db: creating database %s", dbName)
 			if err := dm.createDatabase(db, dbName); err != nil {
+				debug.Logf("db: failed to create database %s: %v", dbName, err)
 				return nil, fmt.Errorf("failed to create database %s: %w", dbName, err)
 			}
 			createdCount++

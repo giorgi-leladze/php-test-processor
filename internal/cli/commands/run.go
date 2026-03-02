@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"ptp/internal/config"
+	"ptp/internal/debug"
 	"ptp/internal/discovery"
 	"ptp/internal/domain"
 	"ptp/internal/execution"
@@ -139,11 +140,18 @@ func (rc *RunCommand) RunOnlyFailedAndSave() (*domain.TestResultsOutput, error) 
 
 // Execute runs the command
 func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
+	debug.Logf("run: starting (processors=%d, testPath=%q, failFast=%v, onlyFailed=%v, rerunFailures=%v, migrate=%v)",
+		rc.config.Processors, rc.config.GetTestPath(), rc.config.Flags.FailFast, rc.config.Flags.OnlyFailed,
+		rc.config.Flags.RerunFailures, rc.config.Flags.Migrate)
+
 	// Run migrations if flag is set
 	if rc.config.Flags.Migrate {
+		debug.Log("run: starting pre-test migrations")
 		if err := rc.migrator.Run(rc.config.Processors, rc.config.Flags.NoFresh); err != nil {
+			debug.Logf("run: migration failed: %v", err)
 			return fmt.Errorf("migration failed: %w", err)
 		}
+		debug.Log("run: migrations completed")
 		fmt.Println()
 	}
 
@@ -155,8 +163,10 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 
 	var tests []string
 	if onlyFailed {
+		debug.Log("run: loading previous results for --failed mode")
 		last, err := rc.storage.Load()
 		if err != nil || last == nil {
+			debug.Logf("run: no previous results (err=%v), falling back to all tests", err)
 			color.Yellow("No previous run found (or no storage). Running all tests.")
 			onlyFailed = false
 		} else {
@@ -167,22 +177,28 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 			}
 			discovered, err := rc.scanner.Scan(testPath)
 			if err != nil {
+				debug.Logf("run: scan failed for --failed mode: %v", err)
 				return err
 			}
 			discovered = rc.filter.FilterByName(discovered, rc.config.Flags.NameFilter)
 			tests = filterTestsToFailed(projectPath, discovered, failedSet)
 			if len(tests) == 0 {
+				debug.Log("run: no matching test files for previous failures")
 				color.Yellow("No matching test files for last run's failures. Run all tests? Skipping.")
 				return nil
 			}
+			debug.Logf("run: filtered to %d previously failed tests", len(tests))
 		}
 	}
 	if !onlyFailed {
+		debug.Logf("run: scanning for tests in %q", testPath)
 		discovered, err := rc.scanner.Scan(testPath)
 		if err != nil {
+			debug.Logf("run: scan failed: %v", err)
 			return err
 		}
 		tests = rc.filter.FilterByName(discovered, rc.config.Flags.NameFilter)
+		debug.Logf("run: discovered %d test files", len(tests))
 	}
 
 	if len(tests) == 0 {
@@ -194,10 +210,13 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 	progressBar := ui.NewProgressBar(len(tests), testCaseCount)
 	rc.executor.SetProgress(progressBar)
 
+	debug.Logf("run: executing %d tests (failFast=%v, workers=%d)", len(tests), failFast, rc.config.Processors)
 	results, duration, err := rc.executor.ExecuteWithOptions(tests, failFast)
 	if err != nil {
+		debug.Logf("run: execution error: %v", err)
 		return err
 	}
+	debug.Logf("run: execution finished in %s (%d results)", duration, len(results))
 
 	var failures []domain.TestFailure
 	for _, result := range results {
@@ -205,6 +224,8 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 			failures = append(failures, rc.parser.ParseFailure(result)...)
 		}
 	}
+
+	debug.Logf("run: %d failures found across %d results", len(failures), len(results))
 
 	if rerunFailures && len(failures) > 0 {
 		failedSet := failedPathsFromFailures(projectPath, failures)
@@ -260,9 +281,12 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 	}
 
 	if err := rc.storage.Save(results, failures, duration, rc.config.Processors); err != nil {
+		debug.Logf("run: failed to save results: %v", err)
 		return fmt.Errorf("failed to save test results: %w", err)
 	}
+	debug.Log("run: results saved")
 	if err := rc.formatter.PrintMetaStats(); err != nil {
+		debug.Logf("run: failed to print stats: %v", err)
 		return err
 	}
 	if rc.config.Flags.OpenFaills && len(failures) > 0 && rc.viewer != nil {

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"ptp/internal/debug"
 	"ptp/internal/domain"
 )
 
@@ -38,14 +39,18 @@ func (s *JSONStorage) Save(results []domain.TestResult, failures []domain.TestFa
 
 	data, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
+		debug.Logf("storage: marshal error: %v", err)
 		return fmt.Errorf("marshal results: %w", err)
 	}
 
 	path := s.cfg.GetOutputPath()
+	debug.Logf("storage: saving results to %s (%d bytes)", path, len(data))
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		debug.Logf("storage: create dir error: %v", err)
 		return fmt.Errorf("create output dir: %w", err)
 	}
 	if err := os.WriteFile(path, data, 0644); err != nil {
+		debug.Logf("storage: write error: %v", err)
 		return fmt.Errorf("write results: %w", err)
 	}
 	return nil
@@ -54,14 +59,18 @@ func (s *JSONStorage) Save(results []domain.TestResult, failures []domain.TestFa
 // Load reads the last test results from the configured JSON output file.
 func (s *JSONStorage) Load() (*domain.TestResultsOutput, error) {
 	path := s.cfg.GetOutputPath()
+	debug.Logf("storage: loading results from %s", path)
 	data, err := os.ReadFile(path)
 	if err != nil {
+		debug.Logf("storage: read error: %v", err)
 		return nil, fmt.Errorf("read results file: %w", err)
 	}
 	var output domain.TestResultsOutput
 	if err := json.Unmarshal(data, &output); err != nil {
+		debug.Logf("storage: parse error: %v", err)
 		return nil, fmt.Errorf("parse results: %w", err)
 	}
+	debug.Logf("storage: loaded %d failures, %d total test files", len(output.Details), output.Meta.TotalTestFiles)
 	return &output, nil
 }
 
@@ -69,23 +78,29 @@ func (s *JSONStorage) Load() (*domain.TestResultsOutput, error) {
 func (s *JSONStorage) SaveOutput(output *domain.TestResultsOutput) error {
 	data, err := json.MarshalIndent(output, "", "  ")
 	if err != nil {
+		debug.Logf("storage: marshal error (SaveOutput): %v", err)
 		return fmt.Errorf("marshal results: %w", err)
 	}
 	path := s.cfg.GetOutputPath()
+	debug.Logf("storage: saving output to %s (%d bytes)", path, len(data))
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		debug.Logf("storage: create dir error: %v", err)
 		return fmt.Errorf("create output dir: %w", err)
 	}
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
+		debug.Logf("storage: open file error: %v", err)
 		return fmt.Errorf("create results file: %w", err)
 	}
 	_, err = f.Write(data)
 	if err != nil {
 		f.Close()
+		debug.Logf("storage: write error: %v", err)
 		return fmt.Errorf("write results: %w", err)
 	}
 	if err := f.Sync(); err != nil {
 		f.Close()
+		debug.Logf("storage: sync error: %v", err)
 		return fmt.Errorf("sync results file: %w", err)
 	}
 	f.Close()

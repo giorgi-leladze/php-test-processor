@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"ptp/internal/config"
+	"ptp/internal/debug"
 	"ptp/internal/domain"
 )
 
@@ -43,7 +44,11 @@ func (r *Runner) run(testPath string, filter string, workerID int) domain.TestRe
 	cmd.Env = append(cmd.Env, fmt.Sprintf("DB_DATABASE=%s", r.config.GetDatabaseName(workerID)))
 	cmd.Dir = r.config.ProjectPath
 
+	debug.Logf("runner[w%d]: exec %s %v (dir=%s, db=%s)", workerID, phpunitPath, args, r.config.ProjectPath, r.config.GetDatabaseName(workerID))
 	output, err := cmd.CombinedOutput()
+	if err != nil {
+		debug.Logf("runner[w%d]: FAILED %s: %v", workerID, testPath, err)
+	}
 
 	return domain.TestResult{
 		TestPath: testPath,

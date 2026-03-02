@@ -7,6 +7,7 @@ import (
 	"ptp/internal/cli"
 	"ptp/internal/cli/commands"
 	"ptp/internal/config"
+	"ptp/internal/debug"
 
 	"github.com/spf13/cobra"
 )
@@ -20,6 +21,14 @@ func main() {
 		Short:   "Parallel PHPUnit test processor",
 		Long:    `A high-performance parallel test processor for PHPUnit tests. Execute PHP unit and integration tests in parallel to significantly reduce test execution time.`,
 		Version: version,
+	}
+
+	var debugFlag bool
+	rootCmd.PersistentFlags().BoolVar(&debugFlag, "debug", false, "Enable debug logging to stderr")
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if debugFlag {
+			debug.Enable()
+		}
 	}
 
 	// Create initial config with defaults

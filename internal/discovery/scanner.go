@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"ptp/internal/debug"
 )
 
 // Scanner scans for test files in a directory
@@ -25,13 +27,15 @@ func NewScanner(skipDirs []string) *Scanner {
 func (s *Scanner) Scan(root string) ([]string, error) {
 	var testfiles []string
 
-	// Clean and validate the root path
 	root = filepath.Clean(root)
+	debug.Logf("scanner: scanning root %q", root)
 	info, err := os.Stat(root)
 	if err != nil {
+		debug.Logf("scanner: path does not exist: %s (%v)", root, err)
 		return nil, fmt.Errorf("test path does not exist: %s", root)
 	}
 	if !info.IsDir() {
+		debug.Logf("scanner: path is not a directory: %s", root)
 		return nil, fmt.Errorf("test path is not a directory: %s", root)
 	}
 
@@ -63,5 +67,10 @@ func (s *Scanner) Scan(root string) ([]string, error) {
 		return nil
 	})
 
+	if err != nil {
+		debug.Logf("scanner: walk error: %v", err)
+	} else {
+		debug.Logf("scanner: found %d test files", len(testfiles))
+	}
 	return testfiles, err
 }

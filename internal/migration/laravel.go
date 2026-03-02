@@ -14,6 +14,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/schollz/progressbar/v3"
 	"ptp/internal/config"
+	"ptp/internal/debug"
 	"ptp/internal/domain"
 )
 
@@ -37,21 +38,25 @@ func (lm *LaravelMigrator) Run(workerCount int, noFresh bool) error {
 	color.Cyan("║               Running Database Migrations                  ║")
 	color.Cyan("╚════════════════════════════════════════════════════════════╝\n")
 
-	// Check available databases
+	debug.Logf("migration: checking/creating databases for %d workers", workerCount)
 	availableWorkers, err := lm.databaseManager.CheckAndCreateDatabases(workerCount)
 	if err != nil {
+		debug.Logf("migration: database check failed: %v", err)
 		return fmt.Errorf("failed to check databases: %w", err)
 	}
 
 	if len(availableWorkers) == 0 {
+		debug.Log("migration: no test databases available")
 		return fmt.Errorf("no test databases available")
 	}
+	debug.Logf("migration: %d workers available", len(availableWorkers))
 
-	// Count migration files to determine total progress
 	migrationFiles, err := lm.findMigrationFiles()
 	if err != nil {
+		debug.Logf("migration: failed to find migration files: %v", err)
 		return fmt.Errorf("failed to find migration files: %w", err)
 	}
+	debug.Logf("migration: found %d migration files", len(migrationFiles))
 
 	migrationCount := len(migrationFiles)
 	totalProgress := len(availableWorkers) * migrationCount
@@ -159,9 +164,9 @@ func (lm *LaravelMigrator) findMigrationFiles() ([]string, error) {
 
 // runMigrationForWorker executes migrate or migrate:fresh with streaming output and progress tracking
 func (lm *LaravelMigrator) runMigrationForWorker(workerID int, bar *progressbar.ProgressBar, completedCount *int, progressMu *sync.Mutex, noFresh bool) domain.MigrationResult {
-	// Get absolute path of project directory
 	projectAbsPath, err := filepath.Abs(lm.config.ProjectPath)
 	if err != nil {
+		debug.Logf("migration[w%d]: failed to resolve project path: %v", workerID, err)
 		return domain.MigrationResult{
 			WorkerID: workerID,
 			Success:  false,
@@ -173,12 +178,12 @@ func (lm *LaravelMigrator) runMigrationForWorker(workerID int, bar *progressbar.
 	artisanPath := filepath.Join(projectAbsPath, "artisan")
 	ctx := context.Background()
 
-	// Use migrate or migrate:fresh based on noFresh flag
 	migrateCmd := "migrate:fresh"
 	if noFresh {
 		migrateCmd = "migrate"
 	}
 
+	debug.Logf("migration[w%d]: exec php %s %s --env=testing --force (db=%s)", workerID, artisanPath, migrateCmd, lm.config.GetDatabaseName(workerID))
 	cmd := exec.CommandContext(ctx, "php", artisanPath, migrateCmd, "--env=testing", "--force")
 
 	// Set environment variables
@@ -188,9 +193,9 @@ func (lm *LaravelMigrator) runMigrationForWorker(workerID int, bar *progressbar.
 	// Set working directory
 	cmd.Dir = projectAbsPath
 
-	// Get stdout and stderr pipes for streaming
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		debug.Logf("migration[w%d]: stdout pipe error: %v", workerID, err)
 		return domain.MigrationResult{
 			WorkerID: workerID,
 			Success:  false,
@@ -201,6 +206,7 @@ func (lm *LaravelMigrator) runMigrationForWorker(workerID int, bar *progressbar.
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
+		debug.Logf("migration[w%d]: stderr pipe error: %v", workerID, err)
 		return domain.MigrationResult{
 			WorkerID: workerID,
 			Success:  false,
@@ -209,8 +215,8 @@ func (lm *LaravelMigrator) runMigrationForWorker(workerID int, bar *progressbar.
 		}
 	}
 
-	// Start the command
 	if err := cmd.Start(); err != nil {
+		debug.Logf("migration[w%d]: failed to start: %v", workerID, err)
 		return domain.MigrationResult{
 			WorkerID: workerID,
 			Success:  false,
@@ -283,6 +289,12 @@ func (lm *LaravelMigrator) runMigrationForWorker(workerID int, bar *progressbar.
 	scanWg.Wait()
 
 	output := outputBuilder.String()
+
+	if err != nil {
+		debug.Logf("migration[w%d]: command failed: %v\noutput:\n%s", workerID, err, output)
+	} else {
+		debug.Logf("migration[w%d]: completed successfully", workerID)
+	}
 
 	return domain.MigrationResult{
 		WorkerID: workerID,
