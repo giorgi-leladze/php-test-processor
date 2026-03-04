@@ -5,6 +5,9 @@ on:
     - cron: '10 * * * *' # 02:00 UTC daily
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   create-branch:
     runs-on: ubuntu-latest
