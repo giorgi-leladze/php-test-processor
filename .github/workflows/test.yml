@@ -2,7 +2,7 @@ name: Create Daily Hotfix Branch
 
 on:
   schedule:
-    - cron: '1 0 * * *' # 02:00 UTC daily
+    - cron: '10 * * * *' # 02:00 UTC daily
   workflow_dispatch:
 
 jobs:
