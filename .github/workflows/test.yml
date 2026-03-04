@@ -1,0 +1,41 @@
+name: Create Daily Hotfix Branch
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # 02:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  create-branch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+      - name: Create branch if not exists
+        run: |
+          DATE=$(date -u +"%Y-%m-%d")
+          BRANCH_NAME="hotfix-$DATE"
+
+          echo "Checking if $BRANCH_NAME exists..."
+
+          if git ls-remote --exit-code --heads origin "$BRANCH_NAME"; then
+            echo "Branch already exists. Skipping."
+            exit 0
+          fi
+
+          echo "Creating branch from main..."
+
+          git fetch origin main
+          git checkout -b "$BRANCH_NAME" origin/main
+          git push origin "$BRANCH_NAME"
+
+          echo "Branch $BRANCH_NAME created successfully."
