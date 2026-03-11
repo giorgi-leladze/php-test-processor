@@ -7,10 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/joho/godotenv"
 	"ptp/internal/config"
 	"ptp/internal/debug"
+
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
 )
 
 // DatabaseManager manages test databases
@@ -25,7 +26,7 @@ func NewDatabaseManager(cfg *config.Config) *DatabaseManager {
 
 // CheckAndCreateDatabases checks if test databases exist and creates them if they don't
 func (dm *DatabaseManager) CheckAndCreateDatabases(workerCount int) ([]int, error) {
-	envPath := filepath.Join(dm.config.ProjectPath, ".env")
+	envPath := filepath.Join(dm.config.ProjectPath, ".env.testing")
 	debug.Logf("db: loading env from %s", envPath)
 	if err := godotenv.Load(envPath); err != nil {
 		debug.Logf("db: .env not loaded: %v (falling back to environment)", err)
@@ -126,4 +127,3 @@ func (dm *DatabaseManager) isValidDatabaseName(name string) bool {
 	}
 	return true
 }
-
