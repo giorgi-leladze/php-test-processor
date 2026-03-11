@@ -30,8 +30,8 @@ type Config struct {
 type Flags struct {
 	Processors    int
 	Filter        string
-	Migrate       bool
-	NoFresh       bool
+	SkipMigrate   bool
+	Fresh         bool
 	TestPath      string
 	NameFilter    string
 	TestCases     bool

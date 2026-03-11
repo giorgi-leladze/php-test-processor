@@ -6,8 +6,8 @@ import "ptp/internal/config"
 type Flags struct {
 	Processors    int
 	Filter        string
-	Migrate       bool
-	NoFresh       bool
+	SkipMigrate   bool
+	Fresh         bool
 	TestPath      string
 	NameFilter    string
 	TestCases     bool
@@ -22,8 +22,8 @@ func (f *Flags) ToConfigFlags() config.Flags {
 	return config.Flags{
 		Processors:    f.Processors,
 		Filter:        f.Filter,
-		Migrate:       f.Migrate,
-		NoFresh:       f.NoFresh,
+		SkipMigrate:   f.SkipMigrate,
+		Fresh:         f.Fresh,
 		TestPath:      f.TestPath,
 		NameFilter:    f.NameFilter,
 		TestCases:     f.TestCases,

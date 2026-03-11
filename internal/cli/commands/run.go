@@ -161,14 +161,13 @@ func (rc *RunCommand) RunOnlyFailedAndSave() (*domain.TestResultsOutput, error) 
 
 // Execute runs the command
 func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
-	debug.Logf("run: starting (processors=%d, testPath=%q, failFast=%v, onlyFailed=%v, rerunFailures=%v, migrate=%v)",
+	debug.Logf("run: starting (processors=%d, testPath=%q, failFast=%v, onlyFailed=%v, rerunFailures=%v, skipMigrate=%v, fresh=%v)",
 		rc.config.Processors, rc.config.GetTestPath(), rc.config.Flags.FailFast, rc.config.Flags.OnlyFailed,
-		rc.config.Flags.RerunFailures, rc.config.Flags.Migrate)
+		rc.config.Flags.RerunFailures, rc.config.Flags.SkipMigrate, rc.config.Flags.Fresh)
 
-	// Run migrations if flag is set
-	if rc.config.Flags.Migrate {
+	if !rc.config.Flags.SkipMigrate {
 		debug.Log("run: starting pre-test migrations")
-		if err := rc.migrator.Run(rc.config.Processors, rc.config.Flags.NoFresh); err != nil {
+		if err := rc.migrator.Run(rc.config.Processors, rc.config.Flags.Fresh); err != nil {
 			debug.Logf("run: migration failed: %v", err)
 			return fmt.Errorf("migration failed: %w", err)
 		}

@@ -34,7 +34,7 @@ func NewLaravelMigrator(cfg *config.Config, dbManager *DatabaseManager) *Laravel
 }
 
 // Run executes migrations in parallel for all workers
-func (lm *LaravelMigrator) Run(workerCount int, noFresh bool) error {
+func (lm *LaravelMigrator) Run(workerCount int, fresh bool) error {
 	quiet := debug.IsEnabled()
 
 	if !quiet {
@@ -110,7 +110,7 @@ func (lm *LaravelMigrator) Run(workerCount int, noFresh bool) error {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			result := lm.runMigrationForWorker(id, bar, &completedCount, &progressMu, noFresh)
+			result := lm.runMigrationForWorker(id, bar, &completedCount, &progressMu, fresh)
 			results <- result
 		}(workerID)
 	}
@@ -176,7 +176,7 @@ func (lm *LaravelMigrator) findMigrationFiles() ([]string, error) {
 }
 
 // runMigrationForWorker executes migrate or migrate:fresh with streaming output and progress tracking
-func (lm *LaravelMigrator) runMigrationForWorker(workerID int, bar *progressbar.ProgressBar, completedCount *int, progressMu *sync.Mutex, noFresh bool) domain.MigrationResult {
+func (lm *LaravelMigrator) runMigrationForWorker(workerID int, bar *progressbar.ProgressBar, completedCount *int, progressMu *sync.Mutex, fresh bool) domain.MigrationResult {
 	projectAbsPath, err := filepath.Abs(lm.config.ProjectPath)
 	if err != nil {
 		debug.Logf("migration[w%d]: failed to resolve project path: %v", workerID, err)
@@ -191,9 +191,9 @@ func (lm *LaravelMigrator) runMigrationForWorker(workerID int, bar *progressbar.
 	artisanPath := filepath.Join(projectAbsPath, "artisan")
 	ctx := context.Background()
 
-	migrateCmd := "migrate:fresh"
-	if noFresh {
-		migrateCmd = "migrate"
+	migrateCmd := "migrate"
+	if fresh {
+		migrateCmd = "migrate:fresh"
 	}
 
 	debug.Logf("migration[w%d]: exec php %s %s --env=testing --force (db=%s)", workerID, artisanPath, migrateCmd, lm.config.GetDatabaseName(workerID))

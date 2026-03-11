@@ -25,8 +25,8 @@ func NewMigrateCommand(cfg *config.Config, migrator migration.Migrator) *Migrate
 // Execute runs the command
 func (mc *MigrateCommand) Execute(cmd *cobra.Command, args []string) error {
 	workerCount := mc.config.Processors
-	debug.Logf("migrate: starting (workers=%d, noFresh=%v)", workerCount, mc.config.Flags.NoFresh)
-	if err := mc.migrator.Run(workerCount, mc.config.Flags.NoFresh); err != nil {
+	debug.Logf("migrate: starting (workers=%d, fresh=%v)", workerCount, mc.config.Flags.Fresh)
+	if err := mc.migrator.Run(workerCount, mc.config.Flags.Fresh); err != nil {
 		debug.Logf("migrate: failed: %v", err)
 		return err
 	}

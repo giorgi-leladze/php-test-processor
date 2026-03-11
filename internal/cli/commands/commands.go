@@ -63,8 +63,8 @@ func (c *Commands) Register(rootCmd *cobra.Command, flags *cli.Flags, cfg *confi
 		},
 	}
 	runCmd.Flags().IntVarP(&flags.Processors, "processors", "p", 4, "Number of processors to use")
-	runCmd.Flags().BoolVarP(&flags.Migrate, "migrate", "m", false, "Run migrations before executing tests")
-	runCmd.Flags().BoolVar(&flags.NoFresh, "no-fresh", false, "Run migrations without fresh (only pending migrations)")
+	runCmd.Flags().BoolVar(&flags.SkipMigrate, "skip-migrate", false, "Skip running migrations before tests")
+	runCmd.Flags().BoolVar(&flags.Fresh, "fresh", false, "Run migrate:fresh instead of migrate (drop all tables first)")
 	runCmd.Flags().StringVarP(&flags.TestPath, "test-path", "t", "", "Path to the folder where test detection should start")
 	runCmd.Flags().StringVarP(&flags.NameFilter, "filter", "f", "", "Filter tests by name pattern (supports wildcards, e.g., '*UserTest.php' or '*Payment*')")
 	runCmd.Flags().BoolVar(&flags.FailFast, "fail-fast", false, "Stop on first test failure")
@@ -104,7 +104,7 @@ func (c *Commands) Register(rootCmd *cobra.Command, flags *cli.Flags, cfg *confi
 		},
 	}
 	migrateCmd.Flags().IntVarP(&flags.Processors, "processors", "p", 4, "Number of processors/workers to use")
-	migrateCmd.Flags().BoolVar(&flags.NoFresh, "no-fresh", false, "Run migrations without fresh (only pending migrations)")
+	migrateCmd.Flags().BoolVar(&flags.Fresh, "fresh", false, "Run migrate:fresh instead of migrate (drop all tables first)")
 	rootCmd.AddCommand(migrateCmd)
 
 	// Faills command

@@ -2,6 +2,6 @@ package migration
 
 // Migrator runs database migrations
 type Migrator interface {
-	Run(workerCount int, noFresh bool) error
+	Run(workerCount int, fresh bool) error
 }
 
