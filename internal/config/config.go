@@ -100,10 +100,11 @@ func (c *Config) GetPHPUnitPath() string {
 }
 
 // GetDatabaseName returns the database name for a worker
-func (c *Config) GetDatabaseName(workerID int) string {
+func (c *Config) GetDatabaseName() string {
 	prefix := os.Getenv("DB_DATABASE_PREFIX")
 	if prefix == "" {
 		prefix = "testing"
 	}
-	return fmt.Sprintf("%s_%d", prefix, workerID)
+
+	return prefix
 }
