@@ -43,6 +43,7 @@ func (r *Runner) run(testPath string, filter string, workerID int) domain.TestRe
 
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, fmt.Sprintf("DB_DATABASE=%s", r.config.GetDatabaseName(workerID)))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("TEST_TOKEN=%s", workerID))
 	cmd.Dir = r.config.ProjectPath
 
 	debug.Logf("runner[w%d]: exec %s %v (dir=%s, db=%s)", workerID, phpunitPath, args, r.config.ProjectPath, r.config.GetDatabaseName(workerID))
