@@ -49,10 +49,11 @@ func NewCommands(cfg *config.Config) *Commands {
 func (c *Commands) Register(rootCmd *cobra.Command, flags *cli.Flags, cfg *config.Config) {
 	// Run command
 	runCmd := &cobra.Command{
-		Use:   "run",
-		Short: "Run PHPUnit tests in parallel",
-		Long:  "Discover and execute PHPUnit tests using parallel workers",
-		RunE:  c.Run.Execute,
+		Use:        "run",
+		Short:      "Run PHPUnit tests in parallel",
+		Long:       "Discover and execute PHPUnit tests using parallel workers",
+		RunE:       c.Run.Execute,
+		SilenceUsage: true,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Update config with flags after parsing
 			cfg.Flags = flags.ToConfigFlags()

@@ -279,10 +279,12 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 			if err := rc.storage.Save(results, failures, duration, rc.config.Processors); err != nil {
 				return fmt.Errorf("failed to save test results: %w", err)
 			}
-			if err := rc.formatter.PrintMetaStats(); err != nil {
-				return err
+			if !debug.IsEnabled() {
+				if err := rc.formatter.PrintMetaStats(); err != nil {
+					return err
+				}
 			}
-			if rc.config.Flags.OpenFaills && len(failures) > 0 && rc.viewer != nil {
+			if rc.config.Flags.OpenFaills && len(failures) > 0 && rc.viewer != nil && !debug.IsEnabled() {
 				passed, failed := 0, 0
 				for _, r := range results {
 					if r.Success {
@@ -320,11 +322,13 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to save test results: %w", err)
 	}
 	debug.Log("run: results saved")
-	if err := rc.formatter.PrintMetaStats(); err != nil {
-		debug.Logf("run: failed to print stats: %v", err)
-		return err
+	if !debug.IsEnabled() {
+		if err := rc.formatter.PrintMetaStats(); err != nil {
+			debug.Logf("run: failed to print stats: %v", err)
+			return err
+		}
 	}
-	if rc.config.Flags.OpenFaills && len(failures) > 0 && rc.viewer != nil {
+	if rc.config.Flags.OpenFaills && len(failures) > 0 && rc.viewer != nil && !debug.IsEnabled() {
 		passed, failed := 0, 0
 		for _, r := range results {
 			if r.Success {
