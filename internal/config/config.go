@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -99,11 +100,15 @@ func (c *Config) GetPHPUnitPath() string {
 }
 
 // GetDatabaseName returns the database name for a worker
-func (c *Config) GetDatabaseName() string {
+func (c *Config) GetDatabaseName(workerID int) string {
 	prefix := os.Getenv("DB_DATABASE_PREFIX")
 	if prefix == "" {
 		prefix = "testing"
 	}
 
-	return prefix
+	if workerID == 0 {
+		return prefix
+	}
+	
+	return fmt.Sprintf("%s_%d", prefix, workerID)
 }
