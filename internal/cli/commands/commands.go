@@ -19,6 +19,7 @@ type Commands struct {
 	List    *ListCommand
 	Migrate *MigrateCommand
 	Faills  *FaillsCommand
+	Upgrade *UpgradeCommand
 }
 
 // NewCommands creates all commands with dependencies
@@ -42,6 +43,7 @@ func NewCommands(cfg *config.Config) *Commands {
 		List:    NewListCommand(cfg, scanner, filter, formatter, jsonStorage),
 		Migrate: NewMigrateCommand(cfg, migrator),
 		Faills:  NewFaillsCommand(cfg, jsonStorage, errorViewer),
+		Upgrade: NewUpgradeCommand(),
 	}
 }
 
@@ -116,4 +118,13 @@ func (c *Commands) Register(rootCmd *cobra.Command, flags *cli.Flags, cfg *confi
 		RunE:  c.Faills.Execute,
 	}
 	rootCmd.AddCommand(faillsCmd)
+
+	// Upgrade command
+	upgradeCmd := &cobra.Command{
+		Use:   "upgrade",
+		Short: "Download and install the latest release",
+		Long:  "Detect your OS and architecture, download the latest ptp release from GitHub, and replace the current binary.",
+		RunE:  c.Upgrade.Execute,
+	}
+	rootCmd.AddCommand(upgradeCmd)
 }
