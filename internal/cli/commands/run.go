@@ -304,7 +304,12 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 					},
 					Details: failures,
 				}
-				return rc.viewer.View(output)
+				if err := rc.viewer.View(output); err != nil {
+					return err
+				}
+			}
+			if len(failures) > 0 {
+				return fmt.Errorf("%d test case(s) failed", len(failures))
 			}
 			return nil
 		}
@@ -341,7 +346,12 @@ func (rc *RunCommand) Execute(cmd *cobra.Command, args []string) error {
 			},
 			Details: failures,
 		}
-		return rc.viewer.View(output)
+		if err := rc.viewer.View(output); err != nil {
+			return err
+		}
+	}
+	if len(failures) > 0 {
+		return fmt.Errorf("%d test case(s) failed", len(failures))
 	}
 	return nil
 }
