@@ -195,4 +195,3 @@ If you encounter any issues or have questions, please open an issue on GitHub.
 ---
 
 **Note**: This project is actively maintained. For detailed architecture information, see [ARCHITECTURE.md](./ARCHITECTURE.md).
-# php-test-processor
