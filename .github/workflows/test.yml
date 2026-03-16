@@ -1,0 +1,112 @@
+name: Hotfix Branch Automation
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+  push:
+    branches:
+      - 'hotfix-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-branch:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+      - name: Create branch if not exists
+        run: |
+          DATE=$(date -u +"%Y-%m-%d")
+          BRANCH_NAME="hotfix-$DATE"
+          echo "Checking if $BRANCH_NAME exists..."
+          if git ls-remote --exit-code --heads origin "$BRANCH_NAME"; then
+            echo "Branch already exists. Skipping."
+            exit 0
+          fi
+          echo "Creating branch from master..."
+          git fetch origin master
+          git checkout -b "$BRANCH_NAME" origin/master
+          git push origin "$BRANCH_NAME"
+          echo "Branch $BRANCH_NAME created successfully."
+
+  check-yesterday-hotfix-pr:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if yesterday's hotfix PR is still open
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          YESTERDAY=$(date -u -d "yesterday" +"%Y-%m-%d")
+          BRANCH_NAME="hotfix-$YESTERDAY"
+
+          if ! gh api "repos/${{ github.repository }}/branches/$BRANCH_NAME" &>/dev/null; then
+            echo "Branch $BRANCH_NAME does not exist. Nothing to check."
+            exit 0
+          fi
+
+          PR=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --head "$BRANCH_NAME" \
+            --base master \
+            --state open \
+            --json number,url \
+            --jq '.[0]')
+
+          if [ -z "$PR" ] || [ "$PR" = "null" ]; then
+            echo "No open PR for $BRANCH_NAME. All good."
+            exit 0
+          fi
+
+          PR_URL=$(echo "$PR" | jq -r '.url')
+          curl -s -X POST "$SLACK_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\":warning: You forgot to merge *$BRANCH_NAME* to production.\nPR link: $PR_URL\"}"
+
+  open-pr:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Create PR to master if not already open
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          BRANCH="${{ github.ref_name }}"
+
+          EXISTING=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --head "$BRANCH" \
+            --base master \
+            --state open \
+            --json number \
+            --jq '.[0].number')
+
+          if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
+            echo "PR already exists (#$EXISTING). Skipping."
+            exit 0
+          fi
+
+          PR_URL=$(gh pr create \
+            --title "Hotfix: $BRANCH → master" \
+            --body "Automated PR from \`$BRANCH\` to master." \
+            --head "$BRANCH" \
+            --base master)
+
+          echo "PR created: $PR_URL"
+          curl -s -X POST "$SLACK_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\":rocket: New hotfix PR opened: *$BRANCH* → master\nPR link: $PR_URL\"}"
