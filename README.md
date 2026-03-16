@@ -104,12 +104,6 @@ ptp run --test-path tests/Unit
 ptp run --filter "*UserTest.php"
 ptp run --filter "*Payment*"
 
-# Run migrations before tests
-ptp run --migrate
-
-# Run migrations without fresh (only pending migrations)
-ptp run --migrate --no-fresh
-
 # Combine options
 ptp run --test-path tests/Integration --filter "*Payment*" --processors 8
 ```
