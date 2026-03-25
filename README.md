@@ -104,12 +104,6 @@ ptp run --test-path tests/Unit
 ptp run --filter "*UserTest.php"
 ptp run --filter "*Payment*"
 
-# Run migrations before tests
-ptp run --migrate
-
-# Run migrations without fresh (only pending migrations)
-ptp run --migrate --no-fresh
-
 # Combine options
 ptp run --test-path tests/Integration --filter "*Payment*" --processors 8
 ```
@@ -199,6 +193,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 If you encounter any issues or have questions, please open an issue on GitHub.
 
 ---
-
 **Note**: This project is actively maintained. For detailed architecture information, see [ARCHITECTURE.md](./ARCHITECTURE.md).
-# php-test-processor
